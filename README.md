@@ -1,10 +1,16 @@
-## 프로젝트
+## 서버 설계
+### 시나리오 선택
+- 주제 : 콘서트 예약 서비스
 
-## Getting Started
+### 마일스톤
+- [마일스톤](/docs/01.md)
 
-### Prerequisites
+### 요구사항 문서
+- [요구사항](/docs/02.md)
 
-#### Running Docker Containers
+### ERD
+
+### 인프라 구성도
 
 `local` profile 로 실행하기 위하여 인프라가 설정되어 있는 Docker 컨테이너를 실행해주셔야 합니다.
 
