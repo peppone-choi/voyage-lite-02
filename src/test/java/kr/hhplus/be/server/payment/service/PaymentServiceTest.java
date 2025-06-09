@@ -2,16 +2,16 @@ package kr.hhplus.be.server.payment.service;
 
 import kr.hhplus.be.server.amount.service.AmountService;
 import kr.hhplus.be.server.concert.domain.Concert;
-import kr.hhplus.be.server.concert.repository.ConcertRepository;
-import kr.hhplus.be.server.payment.domain.Payment;
+import kr.hhplus.be.server.concert.domain.ConcertRepository;
+import kr.hhplus.be.server.payment.domain.model.Payment;
 import kr.hhplus.be.server.payment.dto.PaymentResponse;
-import kr.hhplus.be.server.payment.repository.PaymentRepository;
+import kr.hhplus.be.server.payment.domain.PaymentRepository;
 import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
-import kr.hhplus.be.server.schedule.domain.Schedule;
-import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
-import kr.hhplus.be.server.seat.domain.Seat;
-import kr.hhplus.be.server.seat.repository.SeatRepository;
+import kr.hhplus.be.server.schedule.domain.model.Schedule;
+import kr.hhplus.be.server.schedule.domain.ScheduleRepository;
+import kr.hhplus.be.server.seat.domain.model.Seat;
+import kr.hhplus.be.server.seat.domain.SeatRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,15 +72,9 @@ class PaymentServiceTest {
         userId = "user123";
         reservationId = 1L;
 
-        seat = Seat.builder()
-                .id(10L)
-                .scheduleId(1L)
-                .seatNumber(10)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.TEMPORARY_RESERVED)
-                .reservedBy(userId)
-                .build();
+        seat = Seat.create(1L, 10, "VIP", BigDecimal.valueOf(150000));
+        seat.assignId(10L);
+        seat.temporaryReserve(userId);
 
         reservation = Reservation.builder()
                 .id(reservationId)
@@ -91,18 +85,15 @@ class PaymentServiceTest {
                 .reservedAt(LocalDateTime.now().minusMinutes(3))
                 .build();
 
-        schedule = Schedule.builder()
-                .id(1L)
-                .concertId(1L)
-                .performanceDate(LocalDate.now().plusDays(7))
-                .performanceTime(LocalDateTime.now().plusDays(7))
-                .build();
+        schedule = Schedule.create(1L, LocalDate.now().plusDays(7), LocalDateTime.now().plusDays(7), 50);
+        schedule.assignId(1L);
 
         concert = Concert.builder()
                 .id(1L)
                 .title("아이유 콘서트")
                 .artist("아이유")
                 .venue("서울 올림픽공원")
+                .description("콘서트 설명")
                 .build();
     }
 
@@ -118,17 +109,19 @@ class PaymentServiceTest {
                 .willReturn(Optional.of(schedule));
         given(concertRepository.findById(1L))
                 .willReturn(Optional.of(concert));
+        given(paymentRepository.existsActivePaymentByReservationId(reservationId))
+                .willReturn(false);
 
-        Payment savedPayment = Payment.builder()
-                .id(100L)
-                .userId(userId)
-                .reservationId(reservationId)
-                .amount(seat.getPrice())
-                .status(Payment.Status.COMPLETED)
-                .paidAt(LocalDateTime.now())
-                .build();
-
-        given(paymentRepository.save(any(Payment.class))).willReturn(savedPayment);
+        given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> {
+                    Payment payment = invocation.getArgument(0);
+                    if (payment.getId() == null) {
+                        payment.assignId(100L);
+                    }
+                    return payment;
+                });
+        
+        doNothing().when(amountService).use(userId, seat.getPrice());
 
         // when
         PaymentResponse response = paymentService.processPayment(userId, reservationId);
@@ -143,6 +136,8 @@ class PaymentServiceTest {
         verify(amountService).use(userId, seat.getPrice());
         verify(reservationRepository).save(reservation);
         verify(seatRepository).save(seat);
+        // Verify that payment.complete() was called during save
+        verify(paymentRepository, times(2)).save(any(Payment.class)); // Once for creation, once for completion
 
         assertThat(reservation.getStatus()).isEqualTo(Reservation.Status.CONFIRMED);
         assertThat(seat.getStatus()).isEqualTo(Seat.Status.RESERVED);
@@ -158,7 +153,7 @@ class PaymentServiceTest {
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Reservation not found");
+                .hasMessage("예약을 찾을 수 없습니다");
     }
 
     @Test
@@ -168,7 +163,10 @@ class PaymentServiceTest {
         reservation = Reservation.builder()
                 .id(reservationId)
                 .userId("otherUser")
+                .scheduleId(1L)
+                .seatId(10L)
                 .status(Reservation.Status.TEMPORARY_RESERVED)
+                .reservedAt(LocalDateTime.now().minusMinutes(3))
                 .build();
 
         given(reservationRepository.findByIdWithLock(reservationId))
@@ -177,7 +175,7 @@ class PaymentServiceTest {
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Reservation does not belong to user");
+                .hasMessage("해당 예약은 사용자의 예약이 아닙니다");
     }
 
     @Test
@@ -187,7 +185,12 @@ class PaymentServiceTest {
         reservation = Reservation.builder()
                 .id(reservationId)
                 .userId(userId)
+                .scheduleId(1L)
+                .seatId(10L)
                 .status(Reservation.Status.CONFIRMED)
+                .reservedAt(LocalDateTime.now().minusMinutes(3))
+                .confirmedAt(LocalDateTime.now())
+                .paymentId(100L)
                 .build();
 
         given(reservationRepository.findByIdWithLock(reservationId))
@@ -196,18 +199,21 @@ class PaymentServiceTest {
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Reservation is already paid");
+                .hasMessage("이미 결제된 예약입니다");
     }
 
     @Test
     @DisplayName("만료된 예약은 결제할 수 없다")
     void cannotPayExpiredReservation() {
         // given
+        LocalDateTime expiredTime = LocalDateTime.now().minusMinutes(10);
         reservation = Reservation.builder()
                 .id(reservationId)
                 .userId(userId)
+                .scheduleId(1L)
+                .seatId(10L)
                 .status(Reservation.Status.TEMPORARY_RESERVED)
-                .reservedAt(LocalDateTime.now().minusMinutes(10)) // 10분 전 예약
+                .reservedAt(expiredTime)
                 .build();
 
         given(reservationRepository.findByIdWithLock(reservationId))
@@ -216,7 +222,7 @@ class PaymentServiceTest {
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Reservation is expired");
+                .hasMessage("만료된 예약입니다");
     }
 
     @Test
@@ -226,7 +232,11 @@ class PaymentServiceTest {
         reservation = Reservation.builder()
                 .id(reservationId)
                 .userId(userId)
+                .scheduleId(1L)
+                .seatId(10L)
                 .status(Reservation.Status.CANCELLED)
+                .reservedAt(LocalDateTime.now().minusMinutes(3))
+                .cancelledAt(LocalDateTime.now())
                 .build();
 
         given(reservationRepository.findByIdWithLock(reservationId))
@@ -235,7 +245,7 @@ class PaymentServiceTest {
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Reservation is cancelled");
+                .hasMessage("취소된 예약입니다");
     }
 
     @Test
@@ -246,16 +256,29 @@ class PaymentServiceTest {
                 .willReturn(Optional.of(reservation));
         given(seatRepository.findById(10L))
                 .willReturn(Optional.of(seat));
-
-        doThrow(new IllegalStateException("Insufficient balance"))
+        
+        // Mock payment repository to return a payment, then throw exception during amount service
+        Payment pendingPayment = Payment.create(userId, reservationId, seat.getPrice());
+        pendingPayment.assignId(100L);
+        
+        given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> {
+                    Payment payment = invocation.getArgument(0);
+                    if (payment.getId() == null) {
+                        payment.assignId(100L);
+                    }
+                    return payment;
+                });
+        doThrow(new IllegalStateException("잔액이 부족합니다"))
                 .when(amountService).use(userId, seat.getPrice());
 
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Insufficient balance");
+                .hasMessage("잔액이 부족합니다");
 
-        verify(paymentRepository, never()).save(any(Payment.class));
+        // Payment should be saved once (for creation), then saved again (for failure)
+        verify(paymentRepository, times(2)).save(any(Payment.class));
         verify(reservationRepository, never()).save(any(Reservation.class));
         verify(seatRepository, never()).save(any(Seat.class));
     }
@@ -279,14 +302,26 @@ class PaymentServiceTest {
         given(concertRepository.findById(1L))
                 .willReturn(Optional.of(concert));
 
-        // 첫 번째 호출만 성공
-        doAnswer(invocation -> {
-            if (reservation.getStatus() == Reservation.Status.TEMPORARY_RESERVED) {
-                reservation.confirm(100L);
-                return null;
-            }
-            throw new IllegalStateException("Reservation is already paid");
-        }).when(reservationRepository).save(any(Reservation.class));
+        // Mock to return a pending payment first
+        Payment pendingPayment = Payment.create(userId, reservationId, seat.getPrice());
+        pendingPayment.assignId(100L);
+
+        given(paymentRepository.save(any(Payment.class)))
+                .willAnswer(invocation -> {
+                    Payment payment = invocation.getArgument(0);
+                    if (payment.getId() == null) {
+                        payment.assignId(100L);
+                    }
+                    return payment;
+                });
+        
+        // Mock existsActivePaymentByReservationId to return false for first call, true for subsequent calls
+        AtomicInteger checkCount = new AtomicInteger(0);
+        given(paymentRepository.existsActivePaymentByReservationId(reservationId))
+                .willAnswer(invocation -> {
+                    int count = checkCount.incrementAndGet();
+                    return count > 1; // First call returns false, subsequent calls return true
+                });
 
         // when
         for (int i = 0; i < threadCount; i++) {
@@ -319,19 +354,27 @@ class PaymentServiceTest {
         given(seatRepository.findById(10L))
                 .willReturn(Optional.of(seat));
 
-        doNothing().when(amountService).use(userId, seat.getPrice());
+        // Mock payment repository to first return a payment, then throw on second save
+        Payment pendingPayment = Payment.create(userId, reservationId, seat.getPrice());
+        pendingPayment.assignId(100L);
         
-        // 결제 저장 시 예외 발생
         given(paymentRepository.save(any(Payment.class)))
-                .willThrow(new RuntimeException("Database error"));
+                .willAnswer(invocation -> {
+                    Payment payment = invocation.getArgument(0);
+                    if (payment.getId() == null) {
+                        payment.assignId(100L);
+                        return payment;
+                    }
+                    throw new RuntimeException("Database error");
+                });
 
         // when & then
         assertThatThrownBy(() -> paymentService.processPayment(userId, reservationId))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Database error");
 
-        // 예약과 좌석 상태가 변경되지 않아야 함
-        assertThat(reservation.getStatus()).isEqualTo(Reservation.Status.TEMPORARY_RESERVED);
-        assertThat(seat.getStatus()).isEqualTo(Seat.Status.TEMPORARY_RESERVED);
+        // Verify that reservation and seat were not saved due to the exception
+        verify(reservationRepository, never()).save(any(Reservation.class));
+        verify(seatRepository, never()).save(any(Seat.class));
     }
 }

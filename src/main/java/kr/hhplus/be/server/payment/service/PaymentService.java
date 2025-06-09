@@ -2,16 +2,16 @@ package kr.hhplus.be.server.payment.service;
 
 import kr.hhplus.be.server.amount.service.AmountService;
 import kr.hhplus.be.server.concert.domain.Concert;
-import kr.hhplus.be.server.concert.repository.ConcertRepository;
-import kr.hhplus.be.server.payment.domain.Payment;
+import kr.hhplus.be.server.concert.domain.ConcertRepository;
+import kr.hhplus.be.server.payment.domain.model.Payment;
 import kr.hhplus.be.server.payment.dto.PaymentResponse;
-import kr.hhplus.be.server.payment.repository.PaymentRepository;
+import kr.hhplus.be.server.payment.domain.PaymentRepository;
 import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
-import kr.hhplus.be.server.schedule.domain.Schedule;
-import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
-import kr.hhplus.be.server.seat.domain.Seat;
-import kr.hhplus.be.server.seat.repository.SeatRepository;
+import kr.hhplus.be.server.schedule.domain.model.Schedule;
+import kr.hhplus.be.server.schedule.domain.ScheduleRepository;
+import kr.hhplus.be.server.seat.domain.model.Seat;
+import kr.hhplus.be.server.seat.domain.SeatRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -65,13 +65,7 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalStateException("좌석을 찾을 수 없습니다"));
         
         // Create payment
-        Payment payment = Payment.builder()
-                .userId(userId)
-                .reservationId(reservationId)
-                .amount(seat.getPrice())
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Payment payment = Payment.create(userId, reservationId, seat.getPrice());
         
         Payment savedPayment = paymentRepository.save(payment);
         
@@ -103,9 +97,11 @@ public class PaymentService {
             return convertToResponse(savedPayment, concert, schedule, seat);
             
         } catch (Exception e) {
-            // Fail payment on any error
-            savedPayment.fail(e.getMessage());
-            paymentRepository.save(savedPayment);
+            // Fail payment on any error (only if still pending)
+            if (savedPayment.getStatus() == Payment.Status.PENDING) {
+                savedPayment.fail(e.getMessage());
+                paymentRepository.save(savedPayment);
+            }
             
             log.error("Payment failed for reservation: {}", reservationId, e);
             throw e;

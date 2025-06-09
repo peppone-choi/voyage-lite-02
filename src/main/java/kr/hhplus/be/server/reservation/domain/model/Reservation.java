@@ -38,7 +38,7 @@ public class Reservation {
     
     public void confirm(Long paymentId) {
         if (this.status != Status.TEMPORARY_RESERVED) {
-            throw new IllegalStateException("임시 예약만 확정할 수 있습니다");
+            throw new IllegalStateException("Only temporary reservations can be confirmed");
         }
         this.status = Status.CONFIRMED;
         this.confirmedAt = LocalDateTime.now();
@@ -47,7 +47,7 @@ public class Reservation {
     
     public void cancel() {
         if (this.status == Status.CANCELLED) {
-            throw new IllegalStateException("이미 취소된 예약입니다");
+            throw new IllegalStateException("Reservation is already cancelled");
         }
         this.status = Status.CANCELLED;
         this.cancelledAt = LocalDateTime.now();

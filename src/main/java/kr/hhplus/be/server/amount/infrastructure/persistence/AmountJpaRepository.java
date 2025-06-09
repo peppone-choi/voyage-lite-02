@@ -38,15 +38,6 @@ public class AmountJpaRepository implements AmountRepository {
                 .map(this::toDomainModel);
     }
     
-    @Repository
-    interface SpringAmountJpa extends JpaRepository<AmountEntity, Long> {
-        
-        Optional<AmountEntity> findByUserId(String userId);
-        
-        @Lock(LockModeType.PESSIMISTIC_WRITE)
-        @Query("SELECT a FROM AmountEntity a WHERE a.userId = :userId")
-        Optional<AmountEntity> findByUserIdWithLock(@Param("userId") String userId);
-    }
     
     private AmountEntity toEntity(Amount amount) {
         return AmountEntity.builder()

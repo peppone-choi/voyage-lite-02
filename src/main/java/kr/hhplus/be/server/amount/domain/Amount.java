@@ -27,6 +27,13 @@ public class Amount {
     
     private static final BigDecimal MAX_BALANCE = BigDecimal.valueOf(100000000); // 1억원
     
+    public static Amount createWithBalance(String userId, BigDecimal balance) {
+        return Amount.builder()
+                .userId(userId)
+                .balance(balance)
+                .build();
+    }
+    
     public void charge(BigDecimal amount) {
         validateChargeAmount(amount);
         BigDecimal newBalance = this.balance.add(amount);

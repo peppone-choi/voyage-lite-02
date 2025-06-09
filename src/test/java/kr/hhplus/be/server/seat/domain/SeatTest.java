@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.seat.domain;
 
+import kr.hhplus.be.server.seat.domain.model.Seat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,13 +16,7 @@ class SeatTest {
     @DisplayName("좌석을 생성한다")
     void createSeat() {
         // given & when
-        Seat seat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.AVAILABLE)
-                .build();
+        Seat seat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
 
         // then
         assertThat(seat.getScheduleId()).isEqualTo(1L);
@@ -35,38 +30,20 @@ class SeatTest {
     @DisplayName("좌석 번호는 1~50 범위여야 한다")
     void seatNumberValidation() {
         // given & when & then
-        assertThatThrownBy(() -> Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(0)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.AVAILABLE)
-                .build())
+        assertThatThrownBy(() -> Seat.create(1L, 0, "VIP", BigDecimal.valueOf(150000)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Seat number must be between 1 and 50");
+                .hasMessage("좌석 번호는 1부터 50 사이여야 합니다");
 
-        assertThatThrownBy(() -> Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(51)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.AVAILABLE)
-                .build())
+        assertThatThrownBy(() -> Seat.create(1L, 51, "VIP", BigDecimal.valueOf(150000)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Seat number must be between 1 and 50");
+                .hasMessage("좌석 번호는 1부터 50 사이여야 합니다");
     }
 
     @Test
     @DisplayName("좌석을 임시 예약한다")
     void temporaryReserve() {
         // given
-        Seat seat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.AVAILABLE)
-                .build();
+        Seat seat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
 
         String userId = "user123";
 
@@ -84,35 +61,22 @@ class SeatTest {
     @DisplayName("이미 예약된 좌석은 임시 예약할 수 없다")
     void cannotReserveAlreadyReservedSeat() {
         // given
-        Seat reservedSeat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.RESERVED)
-                .reservedBy("user123")
-                .reservedAt(LocalDateTime.now())
-                .build();
+        Seat reservedSeat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
+        reservedSeat.temporaryReserve("user123");
+        reservedSeat.confirmReservation();
 
         // when & then
         assertThatThrownBy(() -> reservedSeat.temporaryReserve("user456"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Seat is not available for reservation");
+                .hasMessage("좌석을 예약할 수 없습니다");
     }
 
     @Test
     @DisplayName("임시 예약을 확정한다")
     void confirmReservation() {
         // given
-        Seat temporaryReservedSeat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.TEMPORARY_RESERVED)
-                .reservedBy("user123")
-                .reservedAt(LocalDateTime.now())
-                .build();
+        Seat temporaryReservedSeat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
+        temporaryReservedSeat.temporaryReserve("user123");
 
         // when
         temporaryReservedSeat.confirmReservation();
@@ -126,33 +90,20 @@ class SeatTest {
     @DisplayName("임시 예약이 아닌 좌석은 확정할 수 없다")
     void cannotConfirmNonTemporaryReservedSeat() {
         // given
-        Seat availableSeat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.AVAILABLE)
-                .build();
+        Seat availableSeat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
 
         // when & then
         assertThatThrownBy(() -> availableSeat.confirmReservation())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Seat is not temporarily reserved");
+                .hasMessage("임시 예약된 좌석이 아닙니다");
     }
 
     @Test
     @DisplayName("임시 예약을 해제한다")
     void releaseTemporaryReservation() {
         // given
-        Seat temporaryReservedSeat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.TEMPORARY_RESERVED)
-                .reservedBy("user123")
-                .reservedAt(LocalDateTime.now())
-                .build();
+        Seat temporaryReservedSeat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
+        temporaryReservedSeat.temporaryReserve("user123");
 
         // when
         temporaryReservedSeat.releaseReservation();
@@ -176,7 +127,7 @@ class SeatTest {
                 .price(BigDecimal.valueOf(150000))
                 .status(Seat.Status.TEMPORARY_RESERVED)
                 .reservedBy("user123")
-                .reservedAt(now.minusMinutes(6)) // 6분 전
+                .reservedAt(now.minusMinutes(6))
                 .build();
 
         Seat validReservation = Seat.builder()
@@ -186,7 +137,7 @@ class SeatTest {
                 .price(BigDecimal.valueOf(150000))
                 .status(Seat.Status.TEMPORARY_RESERVED)
                 .reservedBy("user456")
-                .reservedAt(now.minusMinutes(3)) // 3분 전
+                .reservedAt(now.minusMinutes(3))
                 .build();
 
         // when & then
@@ -198,15 +149,8 @@ class SeatTest {
     @DisplayName("좌석이 특정 사용자에 의해 예약되었는지 확인한다")
     void isReservedBy() {
         // given
-        Seat seat = Seat.builder()
-                .scheduleId(1L)
-                .seatNumber(1)
-                .grade("VIP")
-                .price(BigDecimal.valueOf(150000))
-                .status(Seat.Status.TEMPORARY_RESERVED)
-                .reservedBy("user123")
-                .reservedAt(LocalDateTime.now())
-                .build();
+        Seat seat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
+        seat.temporaryReserve("user123");
 
         // when & then
         assertThat(seat.isReservedBy("user123")).isTrue();
@@ -217,17 +161,14 @@ class SeatTest {
     @DisplayName("좌석이 예약 가능한지 확인한다")
     void isAvailable() {
         // given
-        Seat availableSeat = Seat.builder()
-                .status(Seat.Status.AVAILABLE)
-                .build();
+        Seat availableSeat = Seat.create(1L, 1, "VIP", BigDecimal.valueOf(150000));
 
-        Seat reservedSeat = Seat.builder()
-                .status(Seat.Status.RESERVED)
-                .build();
+        Seat reservedSeat = Seat.create(1L, 2, "VIP", BigDecimal.valueOf(150000));
+        reservedSeat.temporaryReserve("user123");
+        reservedSeat.confirmReservation();
 
-        Seat temporaryReservedSeat = Seat.builder()
-                .status(Seat.Status.TEMPORARY_RESERVED)
-                .build();
+        Seat temporaryReservedSeat = Seat.create(1L, 3, "VIP", BigDecimal.valueOf(150000));
+        temporaryReservedSeat.temporaryReserve("user123");
 
         // when & then
         assertThat(availableSeat.isAvailable()).isTrue();

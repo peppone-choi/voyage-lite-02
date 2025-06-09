@@ -1,9 +1,9 @@
 package kr.hhplus.be.server.seat.service;
 
 import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
-import kr.hhplus.be.server.seat.domain.Seat;
+import kr.hhplus.be.server.seat.domain.model.Seat;
 import kr.hhplus.be.server.seat.dto.SeatResponse;
-import kr.hhplus.be.server.seat.repository.SeatRepository;
+import kr.hhplus.be.server.seat.domain.SeatRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -42,7 +42,7 @@ public class SeatService {
         try {
             LocalDateTime expirationTime = LocalDateTime.now().minusMinutes(5);
             List<Seat> expiredSeats = seatRepository
-                    .findExpiredTemporaryReservations(Seat.Status.TEMPORARY_RESERVED, expirationTime);
+                    .findExpiredTemporaryReservations(expirationTime);
             
             for (Seat seat : expiredSeats) {
                 seat.releaseReservation();

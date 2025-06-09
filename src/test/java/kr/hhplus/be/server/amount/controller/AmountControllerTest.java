@@ -110,6 +110,8 @@ class AmountControllerTest {
                 .build();
 
         given(queueService.getUserIdFromToken(token)).willReturn("user123");
+        given(amountService.charge("user123", BigDecimal.valueOf(-10000)))
+                .willThrow(new IllegalArgumentException("충전 금액은 0보다 커야 합니다"));
 
         // when & then
         mockMvc.perform(post("/api/amounts/charge")
@@ -131,6 +133,8 @@ class AmountControllerTest {
                 .build();
 
         given(queueService.getUserIdFromToken(token)).willReturn("user123");
+        given(amountService.charge("user123", BigDecimal.ZERO))
+                .willThrow(new IllegalArgumentException("충전 금액은 0보다 커야 합니다"));
 
         // when & then
         mockMvc.perform(post("/api/amounts/charge")

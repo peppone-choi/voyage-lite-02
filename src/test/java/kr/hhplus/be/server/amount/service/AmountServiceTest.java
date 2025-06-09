@@ -1,10 +1,10 @@
 package kr.hhplus.be.server.amount.service;
 
-import kr.hhplus.be.server.amount.domain.Amount;
+import kr.hhplus.be.server.amount.domain.model.Amount;
 import kr.hhplus.be.server.amount.domain.AmountHistory;
 import kr.hhplus.be.server.amount.dto.AmountResponse;
 import kr.hhplus.be.server.amount.repository.AmountHistoryRepository;
-import kr.hhplus.be.server.amount.repository.AmountRepository;
+import kr.hhplus.be.server.amount.domain.AmountRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,13 +52,13 @@ class AmountServiceTest {
         // given
         BigDecimal chargeAmount = BigDecimal.valueOf(50000);
         
-        Amount existingAmount = Amount.builder()
-                .userId(userId)
-                .balance(BigDecimal.valueOf(100000))
-                .build();
+        Amount existingAmount = Amount.createWithBalance(userId, BigDecimal.valueOf(100000));
 
         given(amountRepository.findByUserIdWithLock(userId))
                 .willReturn(Optional.of(existingAmount));
+
+        given(amountRepository.save(existingAmount))
+                .willReturn(existingAmount);
 
         AmountHistory savedHistory = AmountHistory.builder()
                 .id(1L)
@@ -115,20 +115,14 @@ class AmountServiceTest {
         assertThat(response.getUserId()).isEqualTo(userId);
         assertThat(response.getBalance()).isEqualTo(chargeAmount);
         
-        verify(amountRepository).save(argThat(amount ->
-                amount.getUserId().equals(userId) &&
-                amount.getBalance().equals(chargeAmount)
-        ));
+        verify(amountRepository, times(2)).save(any(Amount.class));
     }
 
     @Test
     @DisplayName("잔액을 조회한다")
     void getBalance() {
         // given
-        Amount amount = Amount.builder()
-                .userId(userId)
-                .balance(BigDecimal.valueOf(200000))
-                .build();
+        Amount amount = Amount.createWithBalance(userId, BigDecimal.valueOf(200000));
 
         given(amountRepository.findByUserId(userId))
                 .willReturn(Optional.of(amount));
@@ -162,13 +156,13 @@ class AmountServiceTest {
         // given
         BigDecimal useAmount = BigDecimal.valueOf(30000);
         
-        Amount amount = Amount.builder()
-                .userId(userId)
-                .balance(BigDecimal.valueOf(100000))
-                .build();
+        Amount amount = Amount.createWithBalance(userId, BigDecimal.valueOf(100000));
 
         given(amountRepository.findByUserIdWithLock(userId))
                 .willReturn(Optional.of(amount));
+
+        given(amountRepository.save(amount))
+                .willReturn(amount);
 
         AmountHistory savedHistory = AmountHistory.builder()
                 .id(1L)
@@ -196,10 +190,7 @@ class AmountServiceTest {
         // given
         BigDecimal useAmount = BigDecimal.valueOf(150000);
         
-        Amount amount = Amount.builder()
-                .userId(userId)
-                .balance(BigDecimal.valueOf(100000))
-                .build();
+        Amount amount = Amount.createWithBalance(userId, BigDecimal.valueOf(100000));
 
         given(amountRepository.findByUserIdWithLock(userId))
                 .willReturn(Optional.of(amount));
@@ -207,7 +198,7 @@ class AmountServiceTest {
         // when & then
         assertThatThrownBy(() -> amountService.use(userId, useAmount))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Insufficient balance");
+                .hasMessage("잔액이 부족합니다");
     }
 
     @Test
@@ -219,7 +210,7 @@ class AmountServiceTest {
         // when & then
         assertThatThrownBy(() -> amountService.charge(userId, negativeAmount))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Charge amount must be positive");
+                .hasMessage("충전 금액은 0보다 커야 합니다");
     }
 
     @Test
@@ -231,7 +222,7 @@ class AmountServiceTest {
         // when & then
         assertThatThrownBy(() -> amountService.charge(userId, zeroAmount))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Charge amount must be positive");
+                .hasMessage("충전 금액은 0보다 커야 합니다");
     }
 
     @Test
@@ -243,7 +234,7 @@ class AmountServiceTest {
         // when & then
         assertThatThrownBy(() -> amountService.charge(userId, exceedAmount))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Amount exceeds maximum charge limit");
+                .hasMessage("최대 충전 한도를 초과했습니다");
     }
 
     @Test
@@ -256,10 +247,7 @@ class AmountServiceTest {
         CountDownLatch latch = new CountDownLatch(threadCount);
         AtomicInteger successCount = new AtomicInteger();
 
-        Amount initialAmount = Amount.builder()
-                .userId(userId)
-                .balance(BigDecimal.ZERO)
-                .build();
+        Amount initialAmount = Amount.createWithBalance(userId, BigDecimal.ZERO);
 
         given(amountRepository.findByUserIdWithLock(userId))
                 .willReturn(Optional.of(initialAmount));

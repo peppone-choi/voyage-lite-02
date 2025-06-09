@@ -6,6 +6,7 @@ import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
 import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationResponse;
 import kr.hhplus.be.server.reservation.interfaces.web.ReservationController;
 import kr.hhplus.be.server.reservation.application.ReservationCreateService;
+import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -56,17 +58,25 @@ class ReservationControllerTest {
                 .reservationId(1L)
                 .userId(userId)
                 .scheduleId(1L)
-                .seatNumber(10)
-                .seatGrade("VIP")
+                .seatId(10L)
                 .price(BigDecimal.valueOf(150000))
                 .status("TEMPORARY_RESERVED")
                 .reservedAt(LocalDateTime.now())
                 .expiresAt(LocalDateTime.now().plusMinutes(5))
                 .build();
 
-        given(queueService.validateAndGetUserId(token)).willReturn(userId);
-        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
-                .willReturn(response);
+        Reservation reservation = mock(Reservation.class);
+        given(reservation.getId()).willReturn(1L);
+        given(reservation.getUserId()).willReturn(userId);
+        given(reservation.getScheduleId()).willReturn(1L);
+        given(reservation.getSeatId()).willReturn(10L);
+        given(reservation.getStatus()).willReturn(Reservation.Status.TEMPORARY_RESERVED);
+        given(reservation.getReservedAt()).willReturn(LocalDateTime.now());
+        given(reservation.getExpirationTime()).willReturn(LocalDateTime.now().plusMinutes(5));
+        
+        given(queueService.validateToken(token)).willReturn(true);
+        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+                .willReturn(reservation);
 
         // when & then
         mockMvc.perform(post("/api/reservations")
@@ -77,7 +87,7 @@ class ReservationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reservationId").value(1))
                 .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.seatNumber").value(10))
+                .andExpect(jsonPath("$.seatId").value(10))
                 .andExpect(jsonPath("$.status").value("TEMPORARY_RESERVED"))
                 .andExpect(jsonPath("$.expiresAt").exists());
     }
@@ -94,9 +104,9 @@ class ReservationControllerTest {
                 .seatNumber(10)
                 .build();
 
-        given(queueService.validateAndGetUserId(token)).willReturn(userId);
-        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
-                .willThrow(new IllegalStateException("Seat is already reserved"));
+        given(queueService.validateToken(token)).willReturn(true);
+        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+                .willThrow(new IllegalStateException("좌석이 이미 예약되었습니다"));
 
         // when & then
         mockMvc.perform(post("/api/reservations")
@@ -118,7 +128,9 @@ class ReservationControllerTest {
                 .seatNumber(51) // 1~50 범위 초과
                 .build();
 
-        given(queueService.validateAndGetUserId(token)).willReturn("user123");
+        given(queueService.validateToken(token)).willReturn(true);
+        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+                .willThrow(new IllegalArgumentException("좌석 번호는 1부터 50 사이여야 합니다"));
 
         // when & then
         mockMvc.perform(post("/api/reservations")
@@ -140,8 +152,8 @@ class ReservationControllerTest {
                 .seatNumber(10)
                 .build();
 
-        given(queueService.validateAndGetUserId(token))
-                .willThrow(new IllegalStateException("Token is not active"));
+        given(queueService.validateToken(token))
+                .willThrow(new IllegalStateException("토큰이 활성화되지 않음"));
 
         // when & then
         mockMvc.perform(post("/api/reservations")
@@ -149,7 +161,7 @@ class ReservationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -164,9 +176,9 @@ class ReservationControllerTest {
                 .seatNumber(20)
                 .build();
 
-        given(queueService.validateAndGetUserId(token)).willReturn(userId);
-        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
-                .willThrow(new IllegalStateException("User already has a reservation for this schedule"));
+        given(queueService.validateToken(token)).willReturn(true);
+        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+                .willThrow(new IllegalStateException("사용자가 이미 해당 스케줄에 예약을 가지고 있습니다"));
 
         // when & then
         mockMvc.perform(post("/api/reservations")

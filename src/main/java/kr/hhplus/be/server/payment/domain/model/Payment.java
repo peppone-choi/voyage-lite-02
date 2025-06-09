@@ -68,11 +68,11 @@ public class Payment {
     }
     
     public void cancel(String reason) {
-        if (this.status != Status.COMPLETED) {
-            throw new IllegalStateException("완료된 결제만 취소할 수 있습니다");
-        }
         if (this.status == Status.CANCELLED) {
             throw new IllegalStateException("이미 취소된 결제입니다");
+        }
+        if (this.status != Status.COMPLETED) {
+            throw new IllegalStateException("완료된 결제만 취소할 수 있습니다");
         }
         this.status = Status.CANCELLED;
         this.cancelReason = reason;
@@ -84,5 +84,9 @@ public class Payment {
             return false;
         }
         return this.paidAt.plusDays(7).isAfter(LocalDateTime.now());
+    }
+    
+    public boolean isCompleted() {
+        return this.status == Status.COMPLETED;
     }
 }

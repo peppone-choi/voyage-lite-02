@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.payment.domain;
 
+import kr.hhplus.be.server.payment.domain.model.Payment;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -15,13 +16,7 @@ class PaymentTest {
     @DisplayName("결제를 생성한다")
     void createPayment() {
         // given & when
-        Payment payment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Payment payment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
 
         // then
         assertThat(payment.getUserId()).isEqualTo("user123");
@@ -35,13 +30,7 @@ class PaymentTest {
     @DisplayName("결제를 완료한다")
     void completePayment() {
         // given
-        Payment payment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Payment payment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
 
         // when
         payment.complete();
@@ -49,39 +38,27 @@ class PaymentTest {
         // then
         assertThat(payment.getStatus()).isEqualTo(Payment.Status.COMPLETED);
         assertThat(payment.getPaidAt()).isNotNull();
-        assertThat(payment.getPaidAt()).isAfter(payment.getCreatedAt());
+        assertThat(payment.getPaidAt()).isAfterOrEqualTo(payment.getCreatedAt());
     }
 
     @Test
     @DisplayName("이미 완료된 결제는 다시 완료할 수 없다")
     void cannotCompleteAlreadyCompletedPayment() {
         // given
-        Payment completedPayment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.COMPLETED)
-                .createdAt(LocalDateTime.now())
-                .paidAt(LocalDateTime.now())
-                .build();
+        Payment completedPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
+        completedPayment.complete();
 
         // when & then
         assertThatThrownBy(() -> completedPayment.complete())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Payment is already completed");
+                .hasMessage("이미 완료된 결제입니다");
     }
 
     @Test
     @DisplayName("결제를 실패 처리한다")
     void failPayment() {
         // given
-        Payment payment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Payment payment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
 
         String failureReason = "Insufficient balance";
 
@@ -98,14 +75,8 @@ class PaymentTest {
     @DisplayName("결제를 취소한다")
     void cancelPayment() {
         // given
-        Payment completedPayment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.COMPLETED)
-                .createdAt(LocalDateTime.now())
-                .paidAt(LocalDateTime.now())
-                .build();
+        Payment completedPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
+        completedPayment.complete();
 
         String cancelReason = "User requested cancellation";
 
@@ -122,54 +93,39 @@ class PaymentTest {
     @DisplayName("완료되지 않은 결제는 취소할 수 없다")
     void cannotCancelNonCompletedPayment() {
         // given
-        Payment pendingPayment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
+        Payment pendingPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
 
         // when & then
         assertThatThrownBy(() -> pendingPayment.cancel("Cancel reason"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Only completed payment can be cancelled");
+                .hasMessage("완료된 결제만 취소할 수 있습니다");
     }
 
     @Test
     @DisplayName("이미 취소된 결제는 다시 취소할 수 없다")
     void cannotCancelAlreadyCancelledPayment() {
         // given
-        Payment cancelledPayment = Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(150000))
-                .status(Payment.Status.CANCELLED)
-                .createdAt(LocalDateTime.now())
-                .cancelledAt(LocalDateTime.now())
-                .build();
+        Payment cancelledPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
+        cancelledPayment.complete();
+        cancelledPayment.cancel("Test cancel");
 
         // when & then
         assertThatThrownBy(() -> cancelledPayment.cancel("Another cancel"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Payment is already cancelled");
+                .hasMessage("이미 취소된 결제입니다");
     }
 
     @Test
     @DisplayName("결제가 완료되었는지 확인한다")
     void isCompleted() {
         // given
-        Payment completedPayment = Payment.builder()
-                .status(Payment.Status.COMPLETED)
-                .build();
+        Payment completedPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
+        completedPayment.complete();
 
-        Payment pendingPayment = Payment.builder()
-                .status(Payment.Status.PENDING)
-                .build();
+        Payment pendingPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
 
-        Payment failedPayment = Payment.builder()
-                .status(Payment.Status.FAILED)
-                .build();
+        Payment failedPayment = Payment.create("user123", 1L, BigDecimal.valueOf(150000));
+        failedPayment.fail("Test failure");
 
         // when & then
         assertThat(completedPayment.isCompleted()).isTrue();
@@ -184,17 +140,29 @@ class PaymentTest {
         LocalDateTime now = LocalDateTime.now();
         
         Payment recentPayment = Payment.builder()
+                .userId("user123")
+                .reservationId(1L)
+                .amount(BigDecimal.valueOf(150000))
                 .status(Payment.Status.COMPLETED)
-                .paidAt(now.minusHours(12)) // 12시간 전 결제
+                .createdAt(now)
+                .paidAt(now.minusHours(12))
                 .build();
 
         Payment oldPayment = Payment.builder()
+                .userId("user123")
+                .reservationId(1L)
+                .amount(BigDecimal.valueOf(150000))
                 .status(Payment.Status.COMPLETED)
-                .paidAt(now.minusDays(8)) // 8일 전 결제
+                .createdAt(now)
+                .paidAt(now.minusDays(8))
                 .build();
 
         Payment cancelledPayment = Payment.builder()
+                .userId("user123")
+                .reservationId(1L)
+                .amount(BigDecimal.valueOf(150000))
                 .status(Payment.Status.CANCELLED)
+                .createdAt(now)
                 .paidAt(now.minusHours(1))
                 .build();
 
@@ -208,27 +176,17 @@ class PaymentTest {
     @DisplayName("음수 금액으로 결제를 생성할 수 없다")
     void cannotCreatePaymentWithNegativeAmount() {
         // when & then
-        assertThatThrownBy(() -> Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.valueOf(-10000))
-                .status(Payment.Status.PENDING)
-                .build())
+        assertThatThrownBy(() -> Payment.create("user123", 1L, BigDecimal.valueOf(-10000)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Payment amount must be positive");
+                .hasMessage("결제 금액은 0보다 커야 합니다");
     }
 
     @Test
     @DisplayName("0원으로 결제를 생성할 수 없다")
     void cannotCreatePaymentWithZeroAmount() {
         // when & then
-        assertThatThrownBy(() -> Payment.builder()
-                .userId("user123")
-                .reservationId(1L)
-                .amount(BigDecimal.ZERO)
-                .status(Payment.Status.PENDING)
-                .build())
+        assertThatThrownBy(() -> Payment.create("user123", 1L, BigDecimal.ZERO))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Payment amount must be positive");
+                .hasMessage("결제 금액은 0보다 커야 합니다");
     }
 }

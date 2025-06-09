@@ -50,15 +50,18 @@ public class ReservationController {
         // 좌석 예약 처리
         Reservation reservation = reservationCreateService.reserveSeat(token, request);
         // 예약 응답 생성
-        ReservationResponse response = new ReservationResponse(
-            reservation.getId(),
-                reservation.getUserId(),
-                reservation.getScheduleId(),
-                reservation.sea,
-                reservation.
-                reservation.getReservedAt(),
-                reservation.getExpiredAt(),
-                reservation.getConfirmedAt());
+        ReservationResponse response = ReservationResponse.builder()
+                .reservationId(reservation.getId())
+                .userId(reservation.getUserId())
+                .scheduleId(reservation.getScheduleId())
+                .seatId(reservation.getSeatId())
+                .price(null) // TODO: 좌석 가격 정보 추가 필요
+                .status(reservation.getStatus().name())
+                .reservedAt(reservation.getReservedAt())
+                .expiresAt(reservation.getStatus() == Reservation.Status.TEMPORARY_RESERVED ? 
+                        reservation.getExpirationTime() : null)
+                .confirmedAt(reservation.getConfirmedAt())
+                .build();
 
         // 예약 응답 반환
         return ResponseEntity.ok(response);

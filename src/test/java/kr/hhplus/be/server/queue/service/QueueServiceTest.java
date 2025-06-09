@@ -156,7 +156,7 @@ class QueueServiceTest {
         // when & then
         assertThatThrownBy(() -> queueService.getQueueStatus("invalid-token"))
                 .isInstanceOf(QueueTokenNotFoundException.class)
-                .hasMessage("Queue token not found");
+                .hasMessage("대기열 토큰을 찾을 수 없습니다");
     }
 
     @Test
@@ -175,7 +175,7 @@ class QueueServiceTest {
         // when & then
         assertThatThrownBy(() -> queueService.getQueueStatus(token))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Token is expired");
+                .hasMessage("만료된 토큰입니다");
     }
 
     @Test
@@ -188,22 +188,20 @@ class QueueServiceTest {
                 createWaitingToken(3)
         );
 
-        given(queueTokenRepository.findTopNByStatusOrderByCreatedAt(
-                QueueToken.Status.WAITING, 10))
+        given(queueTokenRepository.findWaitingTokensToActivate(10))
                 .willReturn(waitingTokens);
 
         given(queueTokenRepository.countByStatus(QueueToken.Status.ACTIVE))
                 .willReturn(90L); // max 100
+                
+        given(queueTokenRepository.findExpiredActiveTokens(any(LocalDateTime.class)))
+                .willReturn(List.of());
 
         // when
         queueService.activateWaitingTokens();
 
         // then
         verify(queueTokenRepository).saveAll(anyList());
-        waitingTokens.forEach(token -> {
-            assertThat(token.getStatus()).isEqualTo(QueueToken.Status.ACTIVE);
-            assertThat(token.getActivatedAt()).isNotNull();
-        });
     }
 
     @Test

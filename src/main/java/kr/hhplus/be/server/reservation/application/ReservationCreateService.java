@@ -6,12 +6,14 @@ import java.util.List;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
-import kr.hhplus.be.server.schedule.domain.Schedule;
-import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
-import kr.hhplus.be.server.seat.domain.Seat;
-import kr.hhplus.be.server.seat.repository.SeatRepository;
+import kr.hhplus.be.server.schedule.domain.model.Schedule;
+import kr.hhplus.be.server.schedule.domain.ScheduleRepository;
+import kr.hhplus.be.server.seat.domain.model.Seat;
+import kr.hhplus.be.server.seat.domain.SeatRepository;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Service
 public class ReservationCreateService {
 
     private final ReservationRepository reservationRepository;

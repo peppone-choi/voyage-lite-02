@@ -1,10 +1,10 @@
 package kr.hhplus.be.server.amount.service;
 
-import kr.hhplus.be.server.amount.domain.Amount;
+import kr.hhplus.be.server.amount.domain.model.Amount;
 import kr.hhplus.be.server.amount.domain.AmountHistory;
 import kr.hhplus.be.server.amount.dto.AmountResponse;
 import kr.hhplus.be.server.amount.repository.AmountHistoryRepository;
-import kr.hhplus.be.server.amount.repository.AmountRepository;
+import kr.hhplus.be.server.amount.domain.AmountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,10 +31,7 @@ public class AmountService {
         // Get or create amount with lock
         Amount amount = amountRepository.findByUserIdWithLock(userId)
                 .orElseGet(() -> {
-                    Amount newAmount = Amount.builder()
-                            .userId(userId)
-                            .balance(BigDecimal.ZERO)
-                            .build();
+                    Amount newAmount = Amount.createWithBalance(userId, BigDecimal.ZERO);
                     return amountRepository.save(newAmount);
                 });
         

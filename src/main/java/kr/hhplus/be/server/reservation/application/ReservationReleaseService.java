@@ -5,7 +5,7 @@ import java.util.List;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
-import kr.hhplus.be.server.seat.repository.SeatRepository;
+import kr.hhplus.be.server.seat.domain.SeatRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 

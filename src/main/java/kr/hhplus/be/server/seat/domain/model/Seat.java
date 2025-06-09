@@ -52,7 +52,7 @@ public class Seat {
     
     public void temporaryReserve(String userId) {
         if (!isAvailable()) {
-            throw new IllegalStateException("예약 가능한 좌석이 아닙니다");
+            throw new IllegalStateException("좌석을 예약할 수 없습니다");
         }
         this.status = Status.TEMPORARY_RESERVED;
         this.reservedBy = userId;

@@ -53,7 +53,7 @@ public class QueueToken {
     
     public void activate() {
         if (this.status == Status.ACTIVE) {
-            throw new IllegalStateException("이미 활성화된 토큰입니다");
+            throw new IllegalStateException("Token is already active");
         }
         if (this.status == Status.EXPIRED) {
             throw new IllegalStateException("만료된 토큰은 활성화할 수 없습니다");
@@ -66,10 +66,10 @@ public class QueueToken {
     
     public void expire() {
         if (this.status == Status.EXPIRED) {
-            throw new IllegalStateException("이미 만료된 토큰입니다");
+            throw new IllegalStateException("Token is already expired");
         }
         if (this.status == Status.WAITING) {
-            throw new IllegalStateException("대기 중인 토큰은 만료시킬 수 없습니다");
+            throw new IllegalStateException("Cannot expire waiting token");
         }
         
         this.status = Status.EXPIRED;

@@ -112,7 +112,7 @@ class ScheduleTest {
         // when & then
         assertThatThrownBy(() -> soldOutSchedule.reserveSeat())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("No available seats");
+                .hasMessage("예약 가능한 좌석이 없습니다");
     }
 
     @Test
