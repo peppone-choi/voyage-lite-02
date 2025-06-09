@@ -1,38 +1,36 @@
-package kr.hhplus.be.server.payment.service;
+package kr.hhplus.be.server.payment.application;
 
-import kr.hhplus.be.server.amount.service.AmountService;
+import kr.hhplus.be.server.amount.domain.AmountRepository;
 import kr.hhplus.be.server.concert.domain.Concert;
-import kr.hhplus.be.server.concert.repository.ConcertRepository;
-import kr.hhplus.be.server.payment.domain.Payment;
+import kr.hhplus.be.server.concert.domain.ConcertRepository;
+import kr.hhplus.be.server.payment.domain.PaymentRepository;
+import kr.hhplus.be.server.payment.domain.model.Payment;
 import kr.hhplus.be.server.payment.dto.PaymentResponse;
-import kr.hhplus.be.server.payment.repository.PaymentRepository;
-import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import kr.hhplus.be.server.reservation.domain.ReservationRepository;
+import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import kr.hhplus.be.server.schedule.domain.Schedule;
-import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
+import kr.hhplus.be.server.schedule.domain.ScheduleRepository;
 import kr.hhplus.be.server.seat.domain.Seat;
-import kr.hhplus.be.server.seat.repository.SeatRepository;
+import kr.hhplus.be.server.seat.domain.SeatRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class PaymentService {
+public class ProcessPaymentUseCase {
 
     private final PaymentRepository paymentRepository;
     private final ReservationRepository reservationRepository;
     private final SeatRepository seatRepository;
     private final ScheduleRepository scheduleRepository;
     private final ConcertRepository concertRepository;
-    private final AmountService amountService;
+    private final AmountRepository amountRepository;
 
     @Transactional
-    public PaymentResponse processPayment(String userId, Long reservationId) {
+    public PaymentResponse execute(String userId, Long reservationId) {
         // Get reservation with lock
         Reservation reservation = reservationRepository.findByIdWithLock(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("예약을 찾을 수 없습니다"));
@@ -65,19 +63,15 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalStateException("좌석을 찾을 수 없습니다"));
         
         // Create payment
-        Payment payment = Payment.builder()
-                .userId(userId)
-                .reservationId(reservationId)
-                .amount(seat.getPrice())
-                .status(Payment.Status.PENDING)
-                .createdAt(LocalDateTime.now())
-                .build();
-        
+        Payment payment = Payment.create(userId, reservationId, seat.getPrice());
         Payment savedPayment = paymentRepository.save(payment);
         
         try {
             // Process payment (deduct from user balance)
-            amountService.use(userId, seat.getPrice());
+            var amount = amountRepository.findByUserIdWithLock(userId)
+                    .orElseThrow(() -> new IllegalStateException("사용자 잔액 정보를 찾을 수 없습니다"));
+            amount.use(seat.getPrice());
+            amountRepository.save(amount);
             
             // Complete payment
             savedPayment.complete();

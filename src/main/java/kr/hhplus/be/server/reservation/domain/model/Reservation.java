@@ -1,41 +1,22 @@
-package kr.hhplus.be.server.reservation.domain;
-
-import jakarta.persistence.*;
-import lombok.*;
+package kr.hhplus.be.server.reservation.domain.model;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
+import lombok.Builder;
+import lombok.Getter;
 
-@Entity
-@Table(name = "reservations", indexes = {
-        @Index(name = "idx_user_schedule", columnList = "userId,scheduleId"),
-        @Index(name = "idx_status", columnList = "status"),
-        @Index(name = "idx_reserved_at", columnList = "reservedAt")
-})
-@Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter
 public class Reservation {
-    
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(nullable = false)
+
     private String userId;
-    
-    @Column(nullable = false)
+
     private Long scheduleId;
-    
-    @Column(nullable = false)
+
     private Long seatId;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+
     private Status status;
-    
-    @Column(nullable = false)
+
     private LocalDateTime reservedAt;
     
     private LocalDateTime confirmedAt;
@@ -94,5 +75,12 @@ public class Reservation {
     
     public boolean isActive() {
         return status == Status.TEMPORARY_RESERVED || status == Status.CONFIRMED;
+    }
+
+    public void assignId(Long id) {
+        if (this.id != null) {
+            throw new IllegalStateException("이미 ID가 할당된 예약입니다");
+        }
+        this.id = id;
     }
 }

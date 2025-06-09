@@ -2,9 +2,10 @@ package kr.hhplus.be.server.reservation.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.hhplus.be.server.queue.service.QueueService;
-import kr.hhplus.be.server.reservation.dto.ReservationRequest;
-import kr.hhplus.be.server.reservation.dto.ReservationResponse;
-import kr.hhplus.be.server.reservation.service.ReservationService;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationResponse;
+import kr.hhplus.be.server.reservation.interfaces.web.ReservationController;
+import kr.hhplus.be.server.reservation.application.ReservationCreateService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,7 @@ class ReservationControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private ReservationService reservationService;
+    private ReservationCreateService reservationCreateService;
 
     @MockBean
     private QueueService queueService;
@@ -64,7 +65,7 @@ class ReservationControllerTest {
                 .build();
 
         given(queueService.validateAndGetUserId(token)).willReturn(userId);
-        given(reservationService.reserveSeat(eq(userId), any(ReservationRequest.class)))
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willReturn(response);
 
         // when & then
@@ -94,7 +95,7 @@ class ReservationControllerTest {
                 .build();
 
         given(queueService.validateAndGetUserId(token)).willReturn(userId);
-        given(reservationService.reserveSeat(eq(userId), any(ReservationRequest.class)))
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willThrow(new IllegalStateException("Seat is already reserved"));
 
         // when & then
@@ -164,7 +165,7 @@ class ReservationControllerTest {
                 .build();
 
         given(queueService.validateAndGetUserId(token)).willReturn(userId);
-        given(reservationService.reserveSeat(eq(userId), any(ReservationRequest.class)))
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willThrow(new IllegalStateException("User already has a reservation for this schedule"));
 
         // when & then

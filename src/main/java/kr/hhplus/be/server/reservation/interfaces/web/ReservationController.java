@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.reservation.controller;
+package kr.hhplus.be.server.reservation.interfaces.web;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -10,12 +10,17 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import kr.hhplus.be.server.queue.service.QueueService;
-import kr.hhplus.be.server.reservation.dto.ReservationRequest;
-import kr.hhplus.be.server.reservation.dto.ReservationResponse;
-import kr.hhplus.be.server.reservation.service.ReservationService;
+import kr.hhplus.be.server.reservation.application.ReservationCreateService;
+import kr.hhplus.be.server.reservation.domain.model.Reservation;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "예약 API", description = "좌석 예약 관련 API")
 @SecurityRequirement(name = "Queue-Token")
@@ -24,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class ReservationController {
 
-    private final ReservationService reservationService;
+    private final ReservationCreateService reservationCreateService;
     private final QueueService queueService;
 
     @Operation(summary = "좌석 예약", description = "좌석을 임시 예약합니다. 5분 이내에 결제를 완료해야 합니다.")
@@ -40,17 +45,22 @@ public class ReservationController {
             @Parameter(description = "대기열 토큰", required = true)
             @RequestHeader("Queue-Token") String token,
             @Valid @RequestBody ReservationRequest request) {
-        try {
-            String userId = queueService.validateAndGetUserId(token);
-            ReservationResponse response = reservationService.reserveSeat(userId, request);
-            return ResponseEntity.ok(response);
-        } catch (IllegalStateException e) {
-            if (e.getMessage().contains("Token")) {
-                return ResponseEntity.status(401).build();
-            }
-            return ResponseEntity.badRequest().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        // 대기열 토큰 검증
+        queueService.validateToken(token);
+        // 좌석 예약 처리
+        Reservation reservation = reservationCreateService.reserveSeat(token, request);
+        // 예약 응답 생성
+        ReservationResponse response = new ReservationResponse(
+            reservation.getId(),
+                reservation.getUserId(),
+                reservation.getScheduleId(),
+                reservation.sea,
+                reservation.
+                reservation.getReservedAt(),
+                reservation.getExpiredAt(),
+                reservation.getConfirmedAt());
+
+        // 예약 응답 반환
+        return ResponseEntity.ok(response);
     }
 }

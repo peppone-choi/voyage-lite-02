@@ -1,5 +1,6 @@
 package kr.hhplus.be.server.reservation.domain;
 
+import kr.hhplus.be.server.reservation.domain.model.Reservation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

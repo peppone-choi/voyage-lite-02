@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.hhplus.be.server.amount.dto.AmountChargeRequest;
 import kr.hhplus.be.server.payment.dto.PaymentRequest;
 import kr.hhplus.be.server.queue.dto.QueueTokenRequest;
-import kr.hhplus.be.server.reservation.dto.ReservationRequest;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

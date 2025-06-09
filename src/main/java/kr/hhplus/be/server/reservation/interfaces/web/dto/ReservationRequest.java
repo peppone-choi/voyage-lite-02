@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.reservation.dto;
+package kr.hhplus.be.server.reservation.interfaces.web.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

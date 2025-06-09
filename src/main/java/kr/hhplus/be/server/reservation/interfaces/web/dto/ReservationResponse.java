@@ -1,4 +1,4 @@
-package kr.hhplus.be.server.reservation.dto;
+package kr.hhplus.be.server.reservation.interfaces.web.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
@@ -17,8 +17,7 @@ public class ReservationResponse {
     private Long reservationId;
     private String userId;
     private Long scheduleId;
-    private Integer seatNumber;
-    private String seatGrade;
+    private Long seatId;
     private BigDecimal price;
     private String status;
     

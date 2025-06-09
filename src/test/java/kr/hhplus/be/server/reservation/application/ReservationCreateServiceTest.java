@@ -1,9 +1,9 @@
-package kr.hhplus.be.server.reservation.service;
+package kr.hhplus.be.server.reservation.application;
 
-import kr.hhplus.be.server.reservation.domain.Reservation;
-import kr.hhplus.be.server.reservation.dto.ReservationRequest;
-import kr.hhplus.be.server.reservation.dto.ReservationResponse;
-import kr.hhplus.be.server.reservation.repository.ReservationRepository;
+import kr.hhplus.be.server.reservation.domain.model.Reservation;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
+import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationResponse;
+import kr.hhplus.be.server.reservation.domain.ReservationRepository;
 import kr.hhplus.be.server.schedule.domain.Schedule;
 import kr.hhplus.be.server.schedule.repository.ScheduleRepository;
 import kr.hhplus.be.server.seat.domain.Seat;
@@ -20,7 +20,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -35,7 +34,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class ReservationServiceTest {
+class ReservationCreateServiceTest {
 
     @Mock
     private ReservationRepository reservationRepository;
@@ -47,7 +46,7 @@ class ReservationServiceTest {
     private ScheduleRepository scheduleRepository;
 
     @InjectMocks
-    private ReservationService reservationService;
+    private ReservationCreateService reservationCreateService;
 
     private String userId;
     private ReservationRequest request;
@@ -103,7 +102,7 @@ class ReservationServiceTest {
         given(reservationRepository.save(any(Reservation.class))).willReturn(savedReservation);
 
         // when
-        ReservationResponse response = reservationService.reserveSeat(userId, request);
+        ReservationResponse response = reservationCreateService.reserveSeat(userId, request);
 
         // then
         assertThat(response).isNotNull();
@@ -128,7 +127,7 @@ class ReservationServiceTest {
                 .willReturn(Optional.of(seat));
 
         // when & then
-        assertThatThrownBy(() -> reservationService.reserveSeat(userId, request))
+        assertThatThrownBy(() -> reservationCreateService.reserveSeat(userId, request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Seat is not available for reservation");
     }
@@ -144,7 +143,7 @@ class ReservationServiceTest {
                 eq(userId), eq(1L), any())).willReturn(true);
 
         // when & then
-        assertThatThrownBy(() -> reservationService.reserveSeat(userId, request))
+        assertThatThrownBy(() -> reservationCreateService.reserveSeat(userId, request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("User already has a reservation for this schedule");
     }
@@ -156,7 +155,7 @@ class ReservationServiceTest {
         given(scheduleRepository.findById(1L)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> reservationService.reserveSeat(userId, request))
+        assertThatThrownBy(() -> reservationCreateService.reserveSeat(userId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Schedule not found");
     }
@@ -170,7 +169,7 @@ class ReservationServiceTest {
                 .willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> reservationService.reserveSeat(userId, request))
+        assertThatThrownBy(() -> reservationCreateService.reserveSeat(userId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Seat not found");
     }
@@ -187,7 +186,7 @@ class ReservationServiceTest {
         given(scheduleRepository.findById(1L)).willReturn(Optional.of(pastSchedule));
 
         // when & then
-        assertThatThrownBy(() -> reservationService.reserveSeat(userId, request))
+        assertThatThrownBy(() -> reservationCreateService.reserveSeat(userId, request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Cannot reserve past schedule");
     }
@@ -205,7 +204,7 @@ class ReservationServiceTest {
         given(scheduleRepository.findById(1L)).willReturn(Optional.of(soldOutSchedule));
 
         // when & then
-        assertThatThrownBy(() -> reservationService.reserveSeat(userId, request))
+        assertThatThrownBy(() -> reservationCreateService.reserveSeat(userId, request))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Schedule is sold out");
     }
@@ -241,7 +240,7 @@ class ReservationServiceTest {
             String testUserId = "user" + i;
             executorService.execute(() -> {
                 try {
-                    reservationService.reserveSeat(testUserId, request);
+                    reservationCreateService.reserveSeat(testUserId, request);
                     successCount.incrementAndGet();
                 } catch (Exception e) {
                     failCount.incrementAndGet();
@@ -298,7 +297,7 @@ class ReservationServiceTest {
         given(seatRepository.findById(2L)).willReturn(Optional.of(expiredSeat2));
 
         // when
-        reservationService.releaseExpiredReservations();
+        reservationCreateService.releaseExpiredReservations();
 
         // then
         verify(seatRepository, times(2)).save(any(Seat.class));
