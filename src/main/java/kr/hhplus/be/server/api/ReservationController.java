@@ -55,7 +55,7 @@ public class ReservationController {
                 .userId(reservation.getUserId())
                 .scheduleId(reservation.getScheduleId())
                 .seatId(reservation.getSeatId())
-                .price(null) // TODO: 좌석 가격 정보 추가 필요
+                .price(null) // 가격은 예약 생성 시 계산되지 않으므로 null로 설정
                 .status(reservation.getStatus().name())
                 .reservedAt(reservation.getReservedAt())
                 .expiresAt(reservation.getStatus() == Reservation.Status.TEMPORARY_RESERVED ? 

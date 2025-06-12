@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import kr.hhplus.be.server.api.dto.reservation.ReservationRequest;
 import kr.hhplus.be.server.domain.reservation.ReservationRepository;
@@ -205,20 +206,33 @@ class ReservationCreateServiceTest {
         AtomicInteger failCount = new AtomicInteger();
 
         given(scheduleRepository.findByIdWithLock(1L)).willReturn(Optional.of(schedule));
-        given(seatRepository.findByScheduleIdAndSeatNumberWithLock(1L, 10))
-                .willReturn(Optional.of(seat));
         given(reservationRepository.existsByUserIdAndScheduleIdAndStatusIn(
                 any(), eq(1L), any())).willReturn(false);
 
-        // 첫 번째 호출만 성공하도록 설정
-        doAnswer(invocation -> {
-            Seat seatArg = invocation.getArgument(0);
-            if (seatArg.getStatus() == Seat.Status.AVAILABLE) {
-                seatArg.temporaryReserve("firstUser");
-                return seatArg;
-            }
-            throw new IllegalStateException("예약 가능한 좌석이 아닙니다");
-        }).when(seatRepository).save(any(Seat.class));
+        // 동시성 시뮬레이션: 첫 번째 쓰레드만 available 상태의 seat을 받고, 나머지는 이미 예약된 seat을 받음
+        AtomicBoolean isFirstCall = new AtomicBoolean(true);
+        given(seatRepository.findByScheduleIdAndSeatNumberWithLock(1L, 10))
+                .willAnswer(invocation -> {
+                    if (isFirstCall.getAndSet(false)) {
+                        // 첫 번째 호출은 available 상태의 seat 반환
+                        return Optional.of(seat);
+                    } else {
+                        // 이후 호출은 이미 예약된 seat 반환
+                        Seat reservedSeat = Seat.builder()
+                                .id(1L)
+                                .scheduleId(1L)
+                                .seatNumber(10)
+                                .grade("VIP")
+                                .price(BigDecimal.valueOf(150000))
+                                .status(Seat.Status.TEMPORARY_RESERVED)
+                                .reservedBy("firstUser")
+                                .reservedAt(LocalDateTime.now())
+                                .build();
+                        return Optional.of(reservedSeat);
+                    }
+                });
+        
+        when(seatRepository.save(any(Seat.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
         for (int i = 0; i < threadCount; i++) {
@@ -280,6 +294,13 @@ class ReservationCreateServiceTest {
                 .willReturn(Arrays.asList(expiredReservation1, expiredReservation2));
         given(seatRepository.findById(1L)).willReturn(Optional.of(expiredSeat1));
         given(seatRepository.findById(2L)).willReturn(Optional.of(expiredSeat2));
+        
+        Schedule schedule = Schedule.create(1L, LocalDate.now(), LocalDateTime.now().plusDays(7), 50);
+        schedule.assignId(1L);
+        // 예약된 좌석 2개 반영 (테스트 시나리오에서 2개의 좌석이 예약됨)
+        schedule.reserveSeat();
+        schedule.reserveSeat();
+        given(scheduleRepository.findById(1L)).willReturn(Optional.of(schedule));
 
         // when
         reservationCreateService.releaseExpiredReservations();
@@ -287,6 +308,7 @@ class ReservationCreateServiceTest {
         // then
         verify(seatRepository, times(2)).save(any(Seat.class));
         verify(reservationRepository, times(2)).save(any(Reservation.class));
+        verify(scheduleRepository, times(2)).save(any(Schedule.class));
 
         assertThat(expiredReservation1.getStatus()).isEqualTo(Reservation.Status.EXPIRED);
         assertThat(expiredReservation2.getStatus()).isEqualTo(Reservation.Status.EXPIRED);
