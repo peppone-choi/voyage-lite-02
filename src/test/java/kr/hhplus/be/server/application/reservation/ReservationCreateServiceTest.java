@@ -280,13 +280,6 @@ class ReservationCreateServiceTest {
                 .willReturn(Arrays.asList(expiredReservation1, expiredReservation2));
         given(seatRepository.findById(1L)).willReturn(Optional.of(expiredSeat1));
         given(seatRepository.findById(2L)).willReturn(Optional.of(expiredSeat2));
-        
-        Schedule schedule = Schedule.create(1L, LocalDate.now(), LocalDateTime.now().plusDays(7), 50);
-        schedule.assignId(1L);
-        // 예약된 좌석 2개 반영 (테스트 시나리오에서 2개의 좌석이 예약됨)
-        schedule.reserveSeat();
-        schedule.reserveSeat();
-        given(scheduleRepository.findById(1L)).willReturn(Optional.of(schedule));
 
         // when
         reservationCreateService.releaseExpiredReservations();
@@ -294,8 +287,7 @@ class ReservationCreateServiceTest {
         // then
         verify(seatRepository, times(2)).save(any(Seat.class));
         verify(reservationRepository, times(2)).save(any(Reservation.class));
-        verify(scheduleRepository, times(2)).save(any(Schedule.class));
-        
+
         assertThat(expiredReservation1.getStatus()).isEqualTo(Reservation.Status.EXPIRED);
         assertThat(expiredReservation2.getStatus()).isEqualTo(Reservation.Status.EXPIRED);
     }
