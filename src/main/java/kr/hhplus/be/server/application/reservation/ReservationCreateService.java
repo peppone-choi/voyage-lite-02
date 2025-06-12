@@ -83,4 +83,36 @@ public class ReservationCreateService {
         
         return reservationRepository.save(reservation);
     }
+
+    /**
+     * 만료된 임시 예약을 해제합니다.
+     * 5분이 지난 임시 예약을 찾아서 만료 처리하고 좌석을 다시 예약 가능한 상태로 변경합니다.
+     */
+    @Transactional
+    public void releaseExpiredReservations() {
+        LocalDateTime expiredTime = LocalDateTime.now().minusMinutes(5);
+        
+        List<Reservation> expiredReservations = reservationRepository
+                .findExpiredTemporaryReservations(Reservation.Status.TEMPORARY_RESERVED, expiredTime);
+        
+        for (Reservation reservation : expiredReservations) {
+            // 좌석 예약 해제
+            Seat seat = seatRepository.findById(reservation.getSeatId())
+                    .orElseThrow(() -> new IllegalStateException("좌석을 찾을 수 없습니다"));
+            
+            seat.releaseReservation();
+            seatRepository.save(seat);
+            
+            // 예약 상태를 만료로 변경
+            reservation.expire();
+            reservationRepository.save(reservation);
+            
+            // 스케줄의 가용 좌석 수 증가
+            Schedule schedule = scheduleRepository.findById(reservation.getScheduleId())
+                    .orElseThrow(() -> new IllegalStateException("일정을 찾을 수 없습니다"));
+            
+            schedule.cancelSeatReservation();
+            scheduleRepository.save(schedule);
+        }
+    }
 }

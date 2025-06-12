@@ -1,21 +1,13 @@
 package kr.hhplus.be.server.application.reservation;
 
-import kr.hhplus.be.server.application.reservation.ReservationCreateService;
-import kr.hhplus.be.server.domain.reservation.model.Reservation;
-import kr.hhplus.be.server.api.dto.reservation.ReservationRequest;
-import kr.hhplus.be.server.domain.reservation.ReservationRepository;
-import kr.hhplus.be.server.domain.schedule.model.Schedule;
-import kr.hhplus.be.server.domain.schedule.ScheduleRepository;
-import kr.hhplus.be.server.domain.seat.model.Seat;
-import kr.hhplus.be.server.domain.seat.SeatRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,13 +18,20 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.*;
+import kr.hhplus.be.server.api.dto.reservation.ReservationRequest;
+import kr.hhplus.be.server.domain.reservation.ReservationRepository;
+import kr.hhplus.be.server.domain.reservation.model.Reservation;
+import kr.hhplus.be.server.domain.schedule.ScheduleRepository;
+import kr.hhplus.be.server.domain.schedule.model.Schedule;
+import kr.hhplus.be.server.domain.seat.SeatRepository;
+import kr.hhplus.be.server.domain.seat.model.Seat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 class ReservationCreateServiceTest {
@@ -196,7 +195,6 @@ class ReservationCreateServiceTest {
     }
 
     @Test
-    @Disabled("동시성 테스트 수정 필요")
     @DisplayName("동시에 여러 사용자가 같은 좌석을 예약하려 할 때 한 명만 성공한다")
     void concurrentReservationOnlySingleSuccess() throws InterruptedException {
         // given
@@ -246,7 +244,6 @@ class ReservationCreateServiceTest {
     }
 
     @Test
-    @Disabled("releaseExpiredReservations 메서드 구현 필요")
     @DisplayName("만료된 임시 예약을 해제한다")
     void releaseExpiredReservations() {
         // given
@@ -283,14 +280,21 @@ class ReservationCreateServiceTest {
                 .willReturn(Arrays.asList(expiredReservation1, expiredReservation2));
         given(seatRepository.findById(1L)).willReturn(Optional.of(expiredSeat1));
         given(seatRepository.findById(2L)).willReturn(Optional.of(expiredSeat2));
+        
+        Schedule schedule = Schedule.create(1L, LocalDate.now(), LocalDateTime.now().plusDays(7), 50);
+        schedule.assignId(1L);
+        // 예약된 좌석 2개 반영 (테스트 시나리오에서 2개의 좌석이 예약됨)
+        schedule.reserveSeat();
+        schedule.reserveSeat();
+        given(scheduleRepository.findById(1L)).willReturn(Optional.of(schedule));
 
         // when
-        // TODO: releaseExpiredReservations 메서드가 구현되지 않음
-        // reservationCreateService.releaseExpiredReservations();
+        reservationCreateService.releaseExpiredReservations();
 
         // then
-        // verify(seatRepository, times(2)).save(any(Seat.class));
-        // verify(reservationRepository, times(2)).save(any(Reservation.class));
+        verify(seatRepository, times(2)).save(any(Seat.class));
+        verify(reservationRepository, times(2)).save(any(Reservation.class));
+        verify(scheduleRepository, times(2)).save(any(Schedule.class));
         
         assertThat(expiredReservation1.getStatus()).isEqualTo(Reservation.Status.EXPIRED);
         assertThat(expiredReservation2.getStatus()).isEqualTo(Reservation.Status.EXPIRED);
