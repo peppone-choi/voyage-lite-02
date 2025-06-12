@@ -1,15 +1,36 @@
 package kr.hhplus.be.server.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.hhplus.be.server.amount.dto.AmountChargeRequest;
-import kr.hhplus.be.server.payment.dto.PaymentRequest;
-import kr.hhplus.be.server.queue.dto.QueueTokenRequest;
-import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
+import java.math.BigDecimal;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import kr.hhplus.be.server.TestcontainersConfiguration;
+import kr.hhplus.be.server.api.dto.amount.AmountChargeRequest;
+import kr.hhplus.be.server.api.dto.payment.PaymentRequest;
+import kr.hhplus.be.server.api.dto.queue.QueueTokenRequest;
+import kr.hhplus.be.server.api.dto.reservation.ReservationRequest;
+import kr.hhplus.be.server.domain.queue.QueueToken;
+import kr.hhplus.be.server.domain.queue.QueueTokenRepository;
+import kr.hhplus.be.server.domain.reservation.ReservationRepository;
+import kr.hhplus.be.server.domain.reservation.model.Reservation;
+import kr.hhplus.be.server.domain.seat.SeatRepository;
+import kr.hhplus.be.server.domain.seat.model.Seat;
+import kr.hhplus.be.server.application.queue.QueueService;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Disabled;
 import org.springframework.beans.factory.annotation.Autowired;
-import kr.hhplus.be.server.TestcontainersConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -17,20 +38,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.UUID;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
+@Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(TestcontainersConfiguration.class)
-@Disabled("통합 테스트 - 테스트 데이터 설정 필요")
 @DisplayName("콘서트 예약 통합 테스트")
 class ConcertReservationIntegrationTest {
 
@@ -39,9 +53,21 @@ class ConcertReservationIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+    
+    @Autowired
+    private QueueTokenRepository queueTokenRepository;
+    
+    @Autowired
+    private ReservationRepository reservationRepository;
+    
+    @Autowired
+    private SeatRepository seatRepository;
+    
+    @Autowired
+    private QueueService queueService;
 
     @Test
-    @Disabled("통합 테스트 - 테스트 데이터 설정 필요")
+    @Transactional
     @DisplayName("콘서트 예약 전체 플로우 테스트")
     void concertReservationFullFlow() throws Exception {
         // 1. 대기열 토큰 발급
@@ -69,8 +95,10 @@ class ConcertReservationIntegrationTest {
                 .andExpect(jsonPath("$.token").value(token))
                 .andExpect(jsonPath("$.queuePosition").exists());
 
-        // 3. 토큰이 활성화될 때까지 기다림 (테스트에서는 바로 활성화된다고 가정)
-        // 실제로는 대기열 활성화 로직이 필요
+        // 3. 토큰 활성화 (테스트 환경에서는 직접 활성화)
+        QueueToken queueToken = queueTokenRepository.findByToken(token).orElseThrow();
+        queueToken.activate();
+        queueTokenRepository.save(queueToken);
 
         // 4. 콘서트 목록 조회
         mockMvc.perform(get("/api/concerts")
@@ -162,5 +190,196 @@ class ConcertReservationIntegrationTest {
                         .header("Queue-Token", token))
                 .andDo(print())
                 .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    @Transactional
+    @DisplayName("만료된 임시예약은 다시 예약 가능해야 한다")
+    void expiredTemporaryReservationCanBeReservedAgain() throws Exception {
+        // 1. 첫 번째 유저 토큰 발급
+        String userId1 = UUID.randomUUID().toString();
+        QueueTokenRequest tokenRequest1 = new QueueTokenRequest(userId1);
+        
+        MvcResult tokenResult1 = mockMvc.perform(post("/api/queue/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(tokenRequest1)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").exists())
+                .andReturn();
+
+        String token1 = objectMapper.readTree(tokenResult1.getResponse().getContentAsString())
+                .get("token").asText();
+                
+        // 토큰을 ACTIVE 상태로 변경
+        var queueToken1 = queueTokenRepository.findByToken(token1).orElseThrow();
+        queueToken1.activate();
+        queueTokenRepository.save(queueToken1);
+
+        // 2. 잔액 충전
+        AmountChargeRequest chargeRequest = AmountChargeRequest.builder()
+                .amount(BigDecimal.valueOf(200000))
+                .build();
+
+        mockMvc.perform(post("/api/amounts/charge")
+                        .header("Queue-Token", token1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(chargeRequest)))
+                .andExpect(status().isOk());
+
+        // 3. 좌석 예약 (임시예약)
+        Long scheduleId = 1L;
+        int seatNumber = 15;
+        ReservationRequest reservationRequest = ReservationRequest.builder()
+                .scheduleId(scheduleId)
+                .seatNumber(seatNumber)
+                .build();
+
+        MvcResult reservationResult = mockMvc.perform(post("/api/reservations")
+                        .header("Queue-Token", token1)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reservationRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("TEMPORARY_RESERVED"))
+                .andReturn();
+
+        Long reservationId = objectMapper.readTree(reservationResult.getResponse().getContentAsString())
+                .get("reservationId").asLong();
+        
+        // 4. 임시예약 만료 시뮬레이션 (예약 만료 시간 변경)
+        Reservation reservation = reservationRepository.findByIdWithLock(reservationId).orElseThrow();
+        reservation.expire();
+        reservationRepository.save(reservation);
+        
+        // 좌석 상태도 다시 AVAILABLE로 변경
+        Seat seat =
+            seatRepository.findByScheduleIdAndSeatNumberWithLock(scheduleId, seatNumber).orElseThrow();
+        seat.releaseReservation();
+        seatRepository.save(seat);
+
+        // 5. 두 번째 유저 토큰 발급
+        String userId2 = UUID.randomUUID().toString();
+        QueueTokenRequest tokenRequest2 = new QueueTokenRequest(userId2);
+        
+        MvcResult tokenResult2 = mockMvc.perform(post("/api/queue/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(tokenRequest2)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String token2 = objectMapper.readTree(tokenResult2.getResponse().getContentAsString())
+                .get("token").asText();
+                
+        // 토큰을 ACTIVE 상태로 변경
+        var queueToken2 = queueTokenRepository.findByToken(token2).orElseThrow();
+        queueToken2.activate();
+        queueTokenRepository.save(queueToken2);
+
+        // 6. 두 번째 유저 잔액 충전
+        mockMvc.perform(post("/api/amounts/charge")
+                        .header("Queue-Token", token2)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(chargeRequest)))
+                .andExpect(status().isOk());
+
+        // 7. 두 번째 유저가 같은 좌석 예약 시도 (성공해야 함)
+        mockMvc.perform(post("/api/reservations")
+                        .header("Queue-Token", token2)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reservationRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("TEMPORARY_RESERVED"));
+    }
+    
+    @Test
+    @DisplayName("다중 유저가 동시에 같은 좌석을 예약하면 한 명만 성공해야 한다")
+    void concurrentSeatReservationOnlyOneSuccess() throws Exception {
+        int threadCount = 10;
+        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger(0);
+        AtomicInteger failCount = new AtomicInteger(0);
+        
+        Long scheduleId = 1L;
+        int seatNumber = 20;
+        
+        // 좌석이 사용 가능한 상태인지 확인
+        // 트랜잭션 없이 호출하기 위해 findByScheduleIdAndSeatNumber 사용
+        Seat seat =
+            seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
+        if (!seat.isAvailable()) {
+            seat.releaseReservation();
+            seatRepository.save(seat);
+        }
+
+        for (int i = 0; i < threadCount; i++) {
+            executorService.submit(() -> {
+                try {
+                    // 각 스레드별로 다른 유저 생성
+                    String userId = UUID.randomUUID().toString();
+                    QueueTokenRequest tokenRequest = new QueueTokenRequest(userId);
+                    
+                    // 토큰 발급
+                    MvcResult tokenResult = mockMvc.perform(post("/api/queue/token")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(tokenRequest)))
+                            .andExpect(status().isOk())
+                            .andReturn();
+
+                    String token = objectMapper.readTree(tokenResult.getResponse().getContentAsString())
+                            .get("token").asText();
+                    
+                    // 토큰을 ACTIVE 상태로 변경
+                    var queueToken = queueTokenRepository.findByToken(token).orElseThrow();
+                    queueToken.activate();
+                    queueTokenRepository.save(queueToken);
+
+                    // 잔액 충전
+                    AmountChargeRequest chargeRequest = AmountChargeRequest.builder()
+                            .amount(BigDecimal.valueOf(200000))
+                            .build();
+
+                    mockMvc.perform(post("/api/amounts/charge")
+                                    .header("Queue-Token", token)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(chargeRequest)))
+                            .andExpect(status().isOk());
+
+                    // 동시에 같은 좌석 예약 시도
+                    ReservationRequest reservationRequest = ReservationRequest.builder()
+                            .scheduleId(scheduleId)
+                            .seatNumber(seatNumber)
+                            .build();
+
+                    MvcResult result = mockMvc.perform(post("/api/reservations")
+                                    .header("Queue-Token", token)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(objectMapper.writeValueAsString(reservationRequest)))
+                            .andReturn();
+                    
+                    if (result.getResponse().getStatus() == 200) {
+                        successCount.incrementAndGet();
+                    } else {
+                        failCount.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    failCount.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        // 모든 스레드가 완료될 때까지 대기
+        latch.await(30, TimeUnit.SECONDS);
+        executorService.shutdown();
+
+        // 검증: 오직 한 명만 성공해야 함
+        assertThat(successCount.get()).isEqualTo(1);
+        assertThat(failCount.get()).isEqualTo(threadCount - 1);
+        
+        // 좌석 상태 확인 (락 없이 조회)
+        Seat finalSeat =
+            seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
+        assertThat(finalSeat.isAvailable()).isFalse();
     }
 }

@@ -1,0 +1,118 @@
+package kr.hhplus.be.server.infrastructure.config;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
+import kr.hhplus.be.server.domain.concert.Concert;
+import kr.hhplus.be.server.domain.concert.ConcertRepository;
+import kr.hhplus.be.server.domain.schedule.model.Schedule;
+import kr.hhplus.be.server.domain.schedule.ScheduleRepository;
+import kr.hhplus.be.server.domain.seat.SeatRepository;
+import kr.hhplus.be.server.domain.seat.model.Seat;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Component
+@Profile({"local", "test"})
+@RequiredArgsConstructor
+public class DataInitializer implements ApplicationRunner {
+
+    private final ConcertRepository concertRepository;
+    private final ScheduleRepository scheduleRepository;
+    private final SeatRepository seatRepository;
+
+    @Override
+    @Transactional
+    public void run(ApplicationArguments args) {
+        log.info("샘플 데이터 초기화 중...");
+        
+        // Create concerts
+        Concert concert1 = Concert.builder()
+                .title("아이유 콘서트 - The Golden Hour")
+                .artist("아이유")
+                .venue("서울 올림픽공원 체조경기장")
+                .description("아이유의 정규 6집 발매 기념 콘서트")
+                .build();
+        
+        Concert concert2 = Concert.builder()
+                .title("BTS 월드투어 - Yet To Come")
+                .artist("BTS")
+                .venue("고척스카이돔")
+                .description("BTS 10주년 기념 월드투어")
+                .build();
+        
+        Concert concert3 = Concert.builder()
+                .title("뉴진스 팬미팅 - Bunnies Camp")
+                .artist("뉴진스")
+                .venue("잠실실내체육관")
+                .description("뉴진스 첫 번째 팬미팅")
+                .build();
+        
+        List<Concert> savedConcerts = concertRepository.saveAll(List.of(concert1, concert2, concert3));
+        
+        // Create schedules and seats
+        createSchedulesAndSeats(savedConcerts.get(0), 3);
+        createSchedulesAndSeats(savedConcerts.get(1), 2);
+        createSchedulesAndSeats(savedConcerts.get(2), 1);
+        
+        log.info("샘플 데이터 초기화 완료");
+    }
+
+    private void createSchedulesAndSeats(Concert concert, int scheduleCount) {
+        LocalDate startDate = LocalDate.now().plusDays(7);
+        
+        for (int i = 0; i < scheduleCount; i++) {
+            LocalDate performanceDate = startDate.plusDays(i * 7);
+            LocalDateTime performanceTime = performanceDate.atTime(LocalTime.of(19, 0));
+            
+            Schedule schedule = Schedule.builder()
+                    .concertId(concert.getId())
+                    .performanceDate(performanceDate)
+                    .performanceTime(performanceTime)
+                    .totalSeats(50)
+                    .availableSeats(50)
+                    .build();
+            
+            Schedule savedSchedule = scheduleRepository.save(schedule);
+            
+            // Create seats (1-50)
+            List<Seat> seats = new ArrayList<>();
+            for (int seatNumber = 1; seatNumber <= 50; seatNumber++) {
+                String grade;
+                BigDecimal price;
+                
+                if (seatNumber <= 10) {
+                    grade = "VIP";
+                    price = BigDecimal.valueOf(150000);
+                } else if (seatNumber <= 30) {
+                    grade = "R";
+                    price = BigDecimal.valueOf(100000);
+                } else {
+                    grade = "S";
+                    price = BigDecimal.valueOf(80000);
+                }
+                
+                Seat seat = Seat.builder()
+                        .scheduleId(savedSchedule.getId())
+                        .seatNumber(seatNumber)
+                        .grade(grade)
+                        .price(price)
+                        .status(Seat.Status.AVAILABLE)
+                        .build();
+                
+                seats.add(seat);
+            }
+            
+            seatRepository.saveAll(seats);
+        }
+    }
+}
