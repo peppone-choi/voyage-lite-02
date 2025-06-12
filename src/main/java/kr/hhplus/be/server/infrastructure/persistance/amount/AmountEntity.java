@@ -27,4 +27,7 @@ public class AmountEntity {
     
     @Column(nullable = false)
     private BigDecimal balance;
+    
+    @Version
+    private Long version;
 }

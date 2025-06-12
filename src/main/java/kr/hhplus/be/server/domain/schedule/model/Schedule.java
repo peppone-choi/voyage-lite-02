@@ -16,6 +16,7 @@ public class Schedule {
     private final LocalDateTime performanceTime;
     private final Integer totalSeats;
     private Integer availableSeats;
+    private Long version;
     
     public static Schedule create(Long concertId, LocalDate performanceDate, LocalDateTime performanceTime, Integer totalSeats) {
         return Schedule.builder()

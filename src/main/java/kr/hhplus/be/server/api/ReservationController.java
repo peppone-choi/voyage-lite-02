@@ -45,10 +45,10 @@ public class ReservationController {
             @Parameter(description = "대기열 토큰", required = true)
             @RequestHeader("Queue-Token") String token,
             @Valid @RequestBody ReservationRequest request) {
-        // 대기열 토큰 검증
-        queueService.validateToken(token);
+        // 대기열 토큰 검증 및 사용자 ID 추출
+        String userId = queueService.validateAndGetUserId(token);
         // 좌석 예약 처리
-        Reservation reservation = reservationCreateService.reserveSeat(token, request);
+        Reservation reservation = reservationCreateService.reserveSeat(userId, request);
         // 예약 응답 생성
         ReservationResponse response = ReservationResponse.builder()
                 .reservationId(reservation.getId())

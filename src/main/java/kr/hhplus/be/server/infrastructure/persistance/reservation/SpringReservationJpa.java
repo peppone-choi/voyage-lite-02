@@ -16,7 +16,7 @@ import java.util.Optional;
 @Repository
 public interface SpringReservationJpa extends JpaRepository<ReservationEntity, Long> {
     
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.OPTIMISTIC)
     @Query("SELECT r FROM ReservationEntity r WHERE r.id = :id")
     Optional<ReservationEntity> findByIdWithLock(@Param("id") Long id);
 

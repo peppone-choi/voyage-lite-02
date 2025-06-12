@@ -16,6 +16,8 @@ public interface SeatRepository {
     
     Optional<Seat> findByScheduleIdAndSeatNumberWithLock(Long scheduleId, Integer seatNumber);
     
+    Optional<Seat> findByScheduleIdAndSeatNumber(Long scheduleId, Integer seatNumber);
+    
     List<Seat> findByScheduleId(Long scheduleId);
     
     List<Seat> findAvailableSeatsByScheduleId(Long scheduleId);

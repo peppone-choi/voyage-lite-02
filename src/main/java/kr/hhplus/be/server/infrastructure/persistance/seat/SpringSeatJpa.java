@@ -17,10 +17,12 @@ public interface SpringSeatJpa extends JpaRepository<SeatEntity, Long> {
     
     List<SeatEntity> findByScheduleId(Long scheduleId);
     
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.OPTIMISTIC)
     @Query("SELECT s FROM SeatEntity s WHERE s.scheduleId = :scheduleId AND s.seatNumber = :seatNumber")
     Optional<SeatEntity> findByScheduleIdAndSeatNumberWithLock(@Param("scheduleId") Long scheduleId, 
                                                         @Param("seatNumber") Integer seatNumber);
+    
+    Optional<SeatEntity> findByScheduleIdAndSeatNumber(Long scheduleId, Integer seatNumber);
     
     @Query("SELECT s FROM SeatEntity s WHERE s.status = :status AND s.reservedAt < :expirationTime")
     List<SeatEntity> findExpiredTemporaryReservations(@Param("status") SeatEntity.Status status, 

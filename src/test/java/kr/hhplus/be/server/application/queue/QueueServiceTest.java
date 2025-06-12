@@ -61,8 +61,7 @@ class QueueServiceTest {
                 .build();
 
         given(queueTokenRepository.save(any(QueueToken.class))).willReturn(queueToken);
-        given(queueTokenRepository.countByStatusAndCreatedAtBefore(
-                eq(QueueToken.Status.WAITING), any(LocalDateTime.class))).willReturn(9L);
+        given(queueTokenRepository.countByStatus(QueueToken.Status.WAITING)).willReturn(9L);
 
         // when
         QueueTokenResponse response = queueService.issueToken(userId);
@@ -220,8 +219,7 @@ class QueueServiceTest {
             return token;
         });
 
-        given(queueTokenRepository.countByStatusAndCreatedAtBefore(
-                any(QueueToken.Status.class), any(LocalDateTime.class)))
+        given(queueTokenRepository.countByStatus(QueueToken.Status.WAITING))
                 .willAnswer(invocation -> (long) successCount.get());
 
         // when

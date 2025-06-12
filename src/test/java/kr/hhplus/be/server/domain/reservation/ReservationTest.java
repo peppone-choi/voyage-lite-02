@@ -70,7 +70,7 @@ class ReservationTest {
         // when & then
         assertThatThrownBy(() -> confirmedReservation.confirm(100L))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Only temporary reservations can be confirmed");
+                .hasMessage("임시 예약만 확정할 수 있습니다");
     }
 
     @Test
@@ -110,7 +110,7 @@ class ReservationTest {
         // when & then
         assertThatThrownBy(() -> cancelledReservation.cancel())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Reservation is already cancelled");
+                .hasMessage("예약이 이미 취소되었습니다");
     }
 
     @Test

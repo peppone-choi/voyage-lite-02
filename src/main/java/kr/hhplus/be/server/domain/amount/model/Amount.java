@@ -12,6 +12,7 @@ public class Amount {
     private Long id;
     private final String userId;
     private BigDecimal balance;
+    private Long version;
     
     private static final BigDecimal MAX_BALANCE = BigDecimal.valueOf(100000000); // 1억원
     

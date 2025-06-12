@@ -33,7 +33,7 @@ public class DataInitializer implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        log.info("Initializing sample data...");
+        log.info("샘플 데이터 초기화 중...");
         
         // Create concerts
         Concert concert1 = Concert.builder()
@@ -64,7 +64,7 @@ public class DataInitializer implements ApplicationRunner {
         createSchedulesAndSeats(savedConcerts.get(1), 2);
         createSchedulesAndSeats(savedConcerts.get(2), 1);
         
-        log.info("Sample data initialization completed");
+        log.info("샘플 데이터 초기화 완료");
     }
 
     private void createSchedulesAndSeats(Concert concert, int scheduleCount) {

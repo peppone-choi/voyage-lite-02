@@ -83,7 +83,7 @@ public class PaymentService {
             seat.confirmReservation();
             seatRepository.save(seat);
             
-            log.info("Payment completed: {} for reservation: {}", savedPayment.getId(), reservationId);
+            log.info("결제 완료: 결제 ID {}, 예약 ID {}", savedPayment.getId(), reservationId);
             
             // Get additional info for response
             Schedule schedule = scheduleRepository.findById(reservation.getScheduleId())
@@ -101,7 +101,7 @@ public class PaymentService {
                 paymentRepository.save(savedPayment);
             }
             
-            log.error("Payment failed for reservation: {}", reservationId, e);
+            log.error("예약 ID {}에 대한 결제 실패", reservationId, e);
             throw e;
         }
     }

@@ -18,6 +18,7 @@ public class Seat {
     private Status status;
     private String reservedBy;
     private LocalDateTime reservedAt;
+    private Long version;
     
     public enum Status {
         AVAILABLE,

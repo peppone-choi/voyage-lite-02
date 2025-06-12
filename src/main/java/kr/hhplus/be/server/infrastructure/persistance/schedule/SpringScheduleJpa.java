@@ -26,7 +26,7 @@ public interface SpringScheduleJpa extends JpaRepository<ScheduleEntity, Long> {
     
     List<ScheduleEntity> findByConcertIdAndPerformanceTimeAfter(Long concertId, LocalDateTime now);
     
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.OPTIMISTIC)
     @Query("SELECT s FROM ScheduleEntity s WHERE s.id = :id")
     Optional<ScheduleEntity> findByIdWithLock(@Param("id") Long id);
 }

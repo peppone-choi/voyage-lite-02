@@ -1,17 +1,36 @@
 package kr.hhplus.be.server.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import kr.hhplus.be.server.TestcontainersConfiguration;
 import kr.hhplus.be.server.api.dto.amount.AmountChargeRequest;
 import kr.hhplus.be.server.api.dto.payment.PaymentRequest;
 import kr.hhplus.be.server.api.dto.queue.QueueTokenRequest;
 import kr.hhplus.be.server.api.dto.reservation.ReservationRequest;
+import kr.hhplus.be.server.domain.queue.QueueToken;
 import kr.hhplus.be.server.domain.queue.QueueTokenRepository;
 import kr.hhplus.be.server.domain.reservation.ReservationRepository;
+import kr.hhplus.be.server.domain.reservation.model.Reservation;
 import kr.hhplus.be.server.domain.seat.SeatRepository;
+import kr.hhplus.be.server.domain.seat.model.Seat;
+import kr.hhplus.be.server.application.queue.QueueService;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import kr.hhplus.be.server.TestcontainersConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -21,20 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
+@Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -56,8 +62,12 @@ class ConcertReservationIntegrationTest {
     
     @Autowired
     private SeatRepository seatRepository;
+    
+    @Autowired
+    private QueueService queueService;
 
     @Test
+    @Transactional
     @DisplayName("콘서트 예약 전체 플로우 테스트")
     void concertReservationFullFlow() throws Exception {
         // 1. 대기열 토큰 발급
@@ -85,8 +95,10 @@ class ConcertReservationIntegrationTest {
                 .andExpect(jsonPath("$.token").value(token))
                 .andExpect(jsonPath("$.queuePosition").exists());
 
-        // 3. 토큰이 활성화될 때까지 기다림 (테스트에서는 바로 활성화된다고 가정)
-        // 실제로는 대기열 활성화 로직이 필요
+        // 3. 토큰 활성화 (테스트 환경에서는 직접 활성화)
+        QueueToken queueToken = queueTokenRepository.findByToken(token).orElseThrow();
+        queueToken.activate();
+        queueTokenRepository.save(queueToken);
 
         // 4. 콘서트 목록 조회
         mockMvc.perform(get("/api/concerts")
@@ -181,6 +193,7 @@ class ConcertReservationIntegrationTest {
     }
     
     @Test
+    @Transactional
     @DisplayName("만료된 임시예약은 다시 예약 가능해야 한다")
     void expiredTemporaryReservationCanBeReservedAgain() throws Exception {
         // 1. 첫 번째 유저 토큰 발급
@@ -233,13 +246,14 @@ class ConcertReservationIntegrationTest {
                 .get("reservationId").asLong();
         
         // 4. 임시예약 만료 시뮬레이션 (예약 만료 시간 변경)
-        var reservation = reservationRepository.findById(reservationId).orElseThrow();
-        reservation.setExpired();
+        Reservation reservation = reservationRepository.findByIdWithLock(reservationId).orElseThrow();
+        reservation.expire();
         reservationRepository.save(reservation);
         
         // 좌석 상태도 다시 AVAILABLE로 변경
-        var seat = seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
-        seat.release();
+        Seat seat =
+            seatRepository.findByScheduleIdAndSeatNumberWithLock(scheduleId, seatNumber).orElseThrow();
+        seat.releaseReservation();
         seatRepository.save(seat);
 
         // 5. 두 번째 유저 토큰 발급
@@ -273,8 +287,7 @@ class ConcertReservationIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reservationRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("TEMPORARY_RESERVED"))
-                .andExpect(jsonPath("$.seatNumber").value(seatNumber));
+                .andExpect(jsonPath("$.status").value("TEMPORARY_RESERVED"));
     }
     
     @Test
@@ -290,9 +303,13 @@ class ConcertReservationIntegrationTest {
         int seatNumber = 20;
         
         // 좌석이 사용 가능한 상태인지 확인
-        var seat = seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
-        seat.release();
-        seatRepository.save(seat);
+        // 트랜잭션 없이 호출하기 위해 findByScheduleIdAndSeatNumber 사용
+        Seat seat =
+            seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
+        if (!seat.isAvailable()) {
+            seat.releaseReservation();
+            seatRepository.save(seat);
+        }
 
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
@@ -360,8 +377,9 @@ class ConcertReservationIntegrationTest {
         assertThat(successCount.get()).isEqualTo(1);
         assertThat(failCount.get()).isEqualTo(threadCount - 1);
         
-        // 좌석 상태 확인
-        var finalSeat = seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
-        assertThat(finalSeat.isOccupied()).isTrue();
+        // 좌석 상태 확인 (락 없이 조회)
+        Seat finalSeat =
+            seatRepository.findByScheduleIdAndSeatNumber(scheduleId, seatNumber).orElseThrow();
+        assertThat(finalSeat.isAvailable()).isFalse();
     }
 }

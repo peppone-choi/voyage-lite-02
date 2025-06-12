@@ -14,7 +14,7 @@ public interface SpringAmountJpa extends JpaRepository<AmountEntity, Long> {
     
     Optional<AmountEntity> findByUserId(String userId);
     
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.OPTIMISTIC)
     @Query("SELECT a FROM AmountEntity a WHERE a.userId = :userId")
     Optional<AmountEntity> findByUserIdWithLock(@Param("userId") String userId);
 }

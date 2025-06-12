@@ -73,7 +73,7 @@ class QueueTokenTest {
         // when & then
         assertThatThrownBy(() -> activeToken.activate())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Token is already active");
+                .hasMessage("토큰이 이미 활성화되었습니다");
     }
 
     @Test
@@ -112,7 +112,7 @@ class QueueTokenTest {
         // when & then
         assertThatThrownBy(() -> expiredToken.expire())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Token is already expired");
+                .hasMessage("토큰이 이미 만료되었습니다");
     }
 
     @Test
@@ -130,7 +130,7 @@ class QueueTokenTest {
         // when & then
         assertThatThrownBy(() -> waitingToken.expire())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Cannot expire waiting token");
+                .hasMessage("대기 중인 토큰은 만료시킬 수 없습니다");
     }
 
     @Test

@@ -7,6 +7,9 @@ import kr.hhplus.be.server.domain.amount.AmountHistoryRepository;
 import kr.hhplus.be.server.domain.amount.AmountRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,9 @@ public class AmountService {
     private static final BigDecimal MAX_CHARGE_AMOUNT = BigDecimal.valueOf(10000000); // 10 million
 
     @Transactional
+    @Retryable(value = OptimisticLockingFailureException.class, 
+               maxAttempts = 3, 
+               backoff = @Backoff(delay = 100))
     public AmountResponse charge(String userId, BigDecimal chargeAmount) {
         validateChargeAmount(chargeAmount);
         
@@ -46,18 +52,21 @@ public class AmountService {
                 .type(AmountHistory.Type.CHARGE)
                 .balanceAfter(savedAmount.getBalance())
                 .createdAt(LocalDateTime.now())
-                .description("Balance charge")
+                .description("잔액 충전")
                 .build();
         
         AmountHistory savedHistory = amountHistoryRepository.save(history);
         
-        log.info("Charged {} for user: {}, new balance: {}", 
-                chargeAmount, userId, savedAmount.getBalance());
+        log.info("사용자 {}에게 {} 충전, 새 잔액: {}", 
+                userId, chargeAmount, savedAmount.getBalance());
         
         return convertToResponse(savedAmount, chargeAmount, savedHistory.getCreatedAt());
     }
 
     @Transactional
+    @Retryable(value = OptimisticLockingFailureException.class, 
+               maxAttempts = 3, 
+               backoff = @Backoff(delay = 100))
     public void use(String userId, BigDecimal useAmount) {
         Amount amount = amountRepository.findByUserIdWithLock(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자 잔액 정보를 찾을 수 없습니다"));
@@ -73,13 +82,13 @@ public class AmountService {
                 .type(AmountHistory.Type.USE)
                 .balanceAfter(savedAmount.getBalance())
                 .createdAt(LocalDateTime.now())
-                .description("Payment for reservation")
+                .description("예약 결제")
                 .build();
         
         amountHistoryRepository.save(history);
         
-        log.info("Used {} for user: {}, new balance: {}", 
-                useAmount, userId, savedAmount.getBalance());
+        log.info("사용자 {}가 {} 사용, 새 잔액: {}", 
+                userId, useAmount, savedAmount.getBalance());
     }
 
     @Transactional(readOnly = true)

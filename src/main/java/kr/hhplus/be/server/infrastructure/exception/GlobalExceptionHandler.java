@@ -28,8 +28,8 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
-                .error("Validation Failed")
-                .message("Invalid input parameters")
+                .error("유효성 검사 실패")
+                .message("입력 파라미터가 잘못되었습니다")
                 .validationErrors(errors)
                 .build();
         
@@ -43,7 +43,7 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
-                .error("Bad Request")
+                .error("잘못된 요청")
                 .message(ex.getMessage())
                 .build();
         
@@ -76,7 +76,7 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.NOT_FOUND.value())
-                .error("Not Found")
+                .error("찾을 수 없음")
                 .message(ex.getMessage())
                 .build();
         
@@ -90,8 +90,8 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("Internal Server Error")
-                .message("An unexpected error occurred")
+                .error("서버 내부 오류")
+                .message("예기치 않은 오류가 발생했습니다")
                 .build();
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);

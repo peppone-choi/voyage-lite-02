@@ -74,8 +74,8 @@ class ReservationControllerTest {
         given(reservation.getReservedAt()).willReturn(LocalDateTime.now());
         given(reservation.getExpirationTime()).willReturn(LocalDateTime.now().plusMinutes(5));
         
-        given(queueService.validateToken(token)).willReturn(true);
-        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+        given(queueService.validateAndGetUserId(token)).willReturn(userId);
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willReturn(reservation);
 
         // when & then
@@ -104,8 +104,8 @@ class ReservationControllerTest {
                 .seatNumber(10)
                 .build();
 
-        given(queueService.validateToken(token)).willReturn(true);
-        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+        given(queueService.validateAndGetUserId(token)).willReturn(userId);
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willThrow(new IllegalStateException("좌석이 이미 예약되었습니다"));
 
         // when & then
@@ -128,8 +128,9 @@ class ReservationControllerTest {
                 .seatNumber(51) // 1~50 범위 초과
                 .build();
 
-        given(queueService.validateToken(token)).willReturn(true);
-        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+        String userId = "user123";
+        given(queueService.validateAndGetUserId(token)).willReturn(userId);
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willThrow(new IllegalArgumentException("좌석 번호는 1부터 50 사이여야 합니다"));
 
         // when & then
@@ -152,7 +153,7 @@ class ReservationControllerTest {
                 .seatNumber(10)
                 .build();
 
-        given(queueService.validateToken(token))
+        given(queueService.validateAndGetUserId(token))
                 .willThrow(new IllegalStateException("토큰이 활성화되지 않음"));
 
         // when & then
@@ -161,7 +162,7 @@ class ReservationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -176,8 +177,8 @@ class ReservationControllerTest {
                 .seatNumber(20)
                 .build();
 
-        given(queueService.validateToken(token)).willReturn(true);
-        given(reservationCreateService.reserveSeat(eq(token), any(ReservationRequest.class)))
+        given(queueService.validateAndGetUserId(token)).willReturn(userId);
+        given(reservationCreateService.reserveSeat(eq(userId), any(ReservationRequest.class)))
                 .willThrow(new IllegalStateException("사용자가 이미 해당 스케줄에 예약을 가지고 있습니다"));
 
         // when & then

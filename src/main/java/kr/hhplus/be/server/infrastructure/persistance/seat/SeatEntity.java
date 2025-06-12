@@ -45,6 +45,9 @@ public class SeatEntity {
     
     private LocalDateTime reservedAt;
     
+    @Version
+    private Long version;
+    
     public enum Status {
         AVAILABLE, TEMPORARY_RESERVED, RESERVED
     }
@@ -59,6 +62,7 @@ public class SeatEntity {
                 .status(mapDomainToEntity(seat.getStatus()))
                 .reservedBy(seat.getReservedBy())
                 .reservedAt(seat.getReservedAt())
+                .version(seat.getVersion())
                 .build();
     }
     
@@ -72,6 +76,7 @@ public class SeatEntity {
                 .status(mapEntityToDomain(this.status))
                 .reservedBy(this.reservedBy)
                 .reservedAt(this.reservedAt)
+                .version(this.version)
                 .build();
     }
     

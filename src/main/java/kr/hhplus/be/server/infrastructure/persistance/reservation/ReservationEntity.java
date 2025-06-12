@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.LocalDateTime;
 import kr.hhplus.be.server.domain.reservation.model.Reservation;
 import lombok.AllArgsConstructor;
@@ -54,6 +55,9 @@ public class ReservationEntity {
     private LocalDateTime cancelledAt;
 
     private Long paymentId;
+
+    @Version
+    private Long version;
 
     public enum Status {
         TEMPORARY_RESERVED,

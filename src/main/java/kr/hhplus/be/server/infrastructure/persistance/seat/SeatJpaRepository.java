@@ -43,6 +43,12 @@ public class SeatJpaRepository implements SeatRepository {
     }
     
     @Override
+    public Optional<Seat> findByScheduleIdAndSeatNumber(Long scheduleId, Integer seatNumber) {
+        return springSeatJpa.findByScheduleIdAndSeatNumber(scheduleId, seatNumber)
+                .map(SeatEntity::toDomain);
+    }
+    
+    @Override
     public List<Seat> findByScheduleId(Long scheduleId) {
         return springSeatJpa.findByScheduleIdAndStatus(scheduleId, SeatEntity.Status.AVAILABLE)
                 .stream()

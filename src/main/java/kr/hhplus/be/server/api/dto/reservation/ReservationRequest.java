@@ -14,11 +14,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ReservationRequest {
     
-    @NotNull(message = "Schedule ID is required")
+    @NotNull(message = "스케줄 ID는 필수입니다")
     private Long scheduleId;
     
-    @NotNull(message = "Seat number is required")
-    @Min(value = 1, message = "Seat number must be at least 1")
-    @Max(value = 50, message = "Seat number must be at most 50")
+    @NotNull(message = "좌석 번호는 필수입니다")
+    @Min(value = 1, message = "좌석 번호는 1 이상이어야 합니다")
+    @Max(value = 50, message = "좌석 번호는 50 이하여야 합니다")
     private Integer seatNumber;
 }

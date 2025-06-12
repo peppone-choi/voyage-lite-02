@@ -14,6 +14,9 @@ import kr.hhplus.be.server.domain.seat.SeatRepository;
 import kr.hhplus.be.server.domain.seat.model.Seat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +33,9 @@ public class ProcessPaymentUseCase {
     private final AmountRepository amountRepository;
 
     @Transactional
+    @Retryable(value = OptimisticLockingFailureException.class, 
+               maxAttempts = 3, 
+               backoff = @Backoff(delay = 100))
     public PaymentResponse execute(String userId, Long reservationId) {
         // Get reservation with lock
         Reservation reservation = reservationRepository.findByIdWithLock(reservationId)
@@ -85,7 +91,7 @@ public class ProcessPaymentUseCase {
             seat.confirmReservation();
             seatRepository.save(seat);
             
-            log.info("Payment completed: {} for reservation: {}", savedPayment.getId(), reservationId);
+            log.info("결제 완료: 결제 ID {}, 예약 ID {}", savedPayment.getId(), reservationId);
             
             // Get additional info for response
             Schedule schedule = scheduleRepository.findById(reservation.getScheduleId())
@@ -101,7 +107,7 @@ public class ProcessPaymentUseCase {
             savedPayment.fail(e.getMessage());
             paymentRepository.save(savedPayment);
             
-            log.error("Payment failed for reservation: {}", reservationId, e);
+            log.error("예약 ID {}에 대한 결제 실패", reservationId, e);
             throw e;
         }
     }

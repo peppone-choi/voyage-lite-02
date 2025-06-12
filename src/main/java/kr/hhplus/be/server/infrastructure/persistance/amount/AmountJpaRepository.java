@@ -17,8 +17,14 @@ public class AmountJpaRepository implements AmountRepository {
     public Amount save(Amount amount) {
         AmountEntity entity = toEntity(amount);
         AmountEntity savedEntity = springAmountJpa.save(entity);
-        amount.assignId(savedEntity.getId());
-        return amount;
+        
+        // 도메인 모델에 저장된 엔티티 정보 반영
+        return Amount.builder()
+                .id(savedEntity.getId())
+                .userId(savedEntity.getUserId())
+                .balance(savedEntity.getBalance())
+                .version(savedEntity.getVersion())
+                .build();
     }
     
     @Override
@@ -39,12 +45,16 @@ public class AmountJpaRepository implements AmountRepository {
                 .id(amount.getId())
                 .userId(amount.getUserId())
                 .balance(amount.getBalance())
+                .version(amount.getVersion())
                 .build();
     }
     
     private Amount toDomainModel(AmountEntity entity) {
-        Amount amount = Amount.createWithBalance(entity.getUserId(), entity.getBalance());
-        amount.assignId(entity.getId());
-        return amount;
+        return Amount.builder()
+                .id(entity.getId())
+                .userId(entity.getUserId())
+                .balance(entity.getBalance())
+                .version(entity.getVersion())
+                .build();
     }
 }

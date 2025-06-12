@@ -64,7 +64,9 @@ public class ReservationJpaRepository implements ReservationRepository{
     public Reservation save(Reservation reservation) {
         ReservationEntity entity = toEntity(reservation);
         ReservationEntity savedEntity = springReservationJpa.save(entity);
-        reservation.assignId(savedEntity.getId());
+        if (reservation.getId() == null) {
+            reservation.assignId(savedEntity.getId());
+        }
         return reservation;
     }
 
@@ -73,15 +75,17 @@ public class ReservationJpaRepository implements ReservationRepository{
         List<ReservationEntity> entities = expiredReservations.stream()
             .map(this::toEntity)
             .toList();
-        springReservationJpa.saveAll(entities);
-        expiredReservations.forEach(reservation -> {
-            reservation.assignId(entities.stream()
-                .filter(entity -> entity.getUserId().equals(reservation.getUserId())
-                    && entity.getScheduleId().equals(reservation.getScheduleId()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("ID에 대한 매핑 실패"))
-                .getId());
-        });
+        List<ReservationEntity> savedEntities = springReservationJpa.saveAll(entities);
+        
+        // 저장된 엔티티와 도메인 모델을 매핑
+        for (int i = 0; i < expiredReservations.size(); i++) {
+            Reservation reservation = expiredReservations.get(i);
+            ReservationEntity savedEntity = savedEntities.get(i);
+            
+            if (reservation.getId() == null) {
+                reservation.assignId(savedEntity.getId());
+            }
+        }
     }
 
     public Optional<Reservation> findById(Long id) {
@@ -105,6 +109,7 @@ public class ReservationJpaRepository implements ReservationRepository{
             .expiredAt(reservation.getExpiredAt())
             .cancelledAt(reservation.getCancelledAt())
             .paymentId(reservation.getPaymentId())
+            .version(reservation.getVersion())
             .build();
     }
 
@@ -120,6 +125,7 @@ public class ReservationJpaRepository implements ReservationRepository{
             .expiredAt(entity.getExpiredAt())
             .cancelledAt(entity.getCancelledAt())
             .paymentId(entity.getPaymentId())
+            .version(entity.getVersion())
             .build();
     }
 }

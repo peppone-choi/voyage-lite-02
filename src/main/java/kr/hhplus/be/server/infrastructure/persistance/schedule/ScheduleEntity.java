@@ -37,6 +37,9 @@ public class ScheduleEntity {
     @Column(nullable = false)
     private Integer availableSeats;
     
+    @Version
+    private Long version;
+    
     public void reserveSeat() {
         if (availableSeats <= 0) {
             throw new IllegalStateException("예약 가능한 좌석이 없습니다");
@@ -71,6 +74,7 @@ public class ScheduleEntity {
                 .performanceTime(schedule.getPerformanceTime())
                 .totalSeats(schedule.getTotalSeats())
                 .availableSeats(schedule.getAvailableSeats())
+                .version(schedule.getVersion())
                 .build();
     }
     
@@ -81,6 +85,7 @@ public class ScheduleEntity {
                 .performanceTime(this.performanceTime)
                 .totalSeats(this.totalSeats)
                 .availableSeats(this.availableSeats)
+                .version(this.version)
                 .build();
         if (this.id != null) {
             schedule.assignId(this.id);

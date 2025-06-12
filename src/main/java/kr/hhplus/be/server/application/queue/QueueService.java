@@ -24,7 +24,7 @@ public class QueueService {
     
     private static final int MAX_ACTIVE_USERS = 100;
     private static final int ACTIVATION_BATCH_SIZE = 10;
-    private static final int ESTIMATED_WAIT_TIME_PER_POSITION = 30; // seconds
+    private static final int ESTIMATED_WAIT_TIME_PER_POSITION = 30; // 초
 
     @Transactional
     public QueueTokenResponse issueToken(String userId) {
@@ -39,19 +39,20 @@ public class QueueService {
             return convertToResponse(existingToken.get());
         }
         
-        // Create new token
+        // Calculate position for new token
+        Long waitingCount = queueTokenRepository.countByStatus(QueueToken.Status.WAITING);
+        int position = waitingCount.intValue() + 1;
+        
+        // Create new token with position
         QueueToken newToken = QueueToken.builder()
                 .token(UUID.randomUUID().toString())
                 .userId(userId)
                 .status(QueueToken.Status.WAITING)
+                .position(position)
                 .createdAt(LocalDateTime.now())
                 .build();
         
         QueueToken savedToken = queueTokenRepository.save(newToken);
-        
-        // Calculate position
-        Long position = calculateQueuePosition(savedToken);
-        savedToken.setPosition(position.intValue());
         
         return convertToResponse(savedToken);
     }
@@ -81,7 +82,7 @@ public class QueueService {
                     .orElse(null);
             return queueToken != null && queueToken.isActive();
         } catch (Exception e) {
-            log.error("Error validating token: {}", token, e);
+            log.error("토큰 검증 오류: {}", token, e);
             return false;
         }
     }
@@ -117,7 +118,7 @@ public class QueueService {
         
         queueToken.expire();
         queueTokenRepository.save(queueToken);
-        log.info("Token expired: {}", token);
+        log.info("토큰 만료: {}", token);
     }
 
     @Scheduled(fixedDelay = 30000) // Every 30 seconds
@@ -144,13 +145,13 @@ public class QueueService {
             // Activate tokens
             for (QueueToken token : waitingTokens) {
                 token.activate();
-                log.info("Activated token for user: {}", token.getUserId());
+                log.info("사용자 {}의 토큰 활성화", token.getUserId());
             }
             
             queueTokenRepository.saveAll(waitingTokens);
             
         } catch (Exception e) {
-            log.error("Error during token activation", e);
+            log.error("토큰 활성화 중 오류", e);
         }
     }
 
@@ -161,7 +162,7 @@ public class QueueService {
         
         for (QueueToken token : expiredTokens) {
             token.expire();
-            log.info("Expired old active token: {}", token.getToken());
+            log.info("오래된 활성 토큰 만료: {}", token.getToken());
         }
         
         if (!expiredTokens.isEmpty()) {

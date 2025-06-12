@@ -28,7 +28,7 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
         // Get token from header
         String token = request.getHeader(QUEUE_TOKEN_HEADER);
         if (token == null || token.trim().isEmpty()) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Queue token is required");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "대기열 토큰이 필요합니다");
             return false;
         }
         
@@ -38,8 +38,8 @@ public class QueueTokenInterceptor implements HandlerInterceptor {
                 String userId = queueService.validateAndGetUserId(token);
                 request.setAttribute("userId", userId);
             } catch (Exception e) {
-                log.warn("Token validation failed: {}", e.getMessage());
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or inactive token");
+                log.warn("\ud1a0\ud070 \uac80\uc99d \uc2e4\ud328: {}", e.getMessage());
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않거나 비활성 토큰입니다");
                 return false;
             }
         }
