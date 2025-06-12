@@ -1,10 +1,10 @@
 package kr.hhplus.be.server.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kr.hhplus.be.server.amount.dto.AmountChargeRequest;
-import kr.hhplus.be.server.payment.dto.PaymentRequest;
-import kr.hhplus.be.server.queue.dto.QueueTokenRequest;
-import kr.hhplus.be.server.reservation.interfaces.web.dto.ReservationRequest;
+import kr.hhplus.be.server.api.dto.amount.AmountChargeRequest;
+import kr.hhplus.be.server.api.dto.payment.PaymentRequest;
+import kr.hhplus.be.server.api.dto.queue.QueueTokenRequest;
+import kr.hhplus.be.server.api.dto.reservation.ReservationRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Disabled;
@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(TestcontainersConfiguration.class)
-@Disabled("통합 테스트 - 테스트 데이터 설정 필요")
+@Disabled("통합 테스트 - PropertyValueException 해결됨, 추가 비즈니스 로직 구현 필요")
 @DisplayName("콘서트 예약 통합 테스트")
 class ConcertReservationIntegrationTest {
 
@@ -41,7 +41,7 @@ class ConcertReservationIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @Disabled("통합 테스트 - 테스트 데이터 설정 필요")
+    @Disabled("통합 테스트 - PropertyValueException 해결됨, 추가 비즈니스 로직 구현 필요")
     @DisplayName("콘서트 예약 전체 플로우 테스트")
     void concertReservationFullFlow() throws Exception {
         // 1. 대기열 토큰 발급

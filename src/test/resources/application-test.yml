@@ -1,11 +1,8 @@
 spring:
-  datasource:
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
-    url: jdbc:tc:mysql:8.0.33:///concert_reservation?TC_REUSABLE=true
   jpa:
     hibernate:
       ddl-auto: create-drop
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
         format_sql: true
@@ -13,3 +10,6 @@ spring:
 logging:
   level:
     kr.hhplus.be.server: DEBUG
+    org.hibernate: DEBUG
+    org.springframework.orm.jpa: DEBUG
+    root: INFO
